@@ -177,6 +177,8 @@ export interface UploadedFile {
 export interface LoginBanner {
   title: string;
   message: string;
+  /** Text shown in the draggable title bar at the top of the window. */
+  titlebar: string;
 }
 
 /** IT-managed application configuration loaded from `resources/admin-config.json`. */

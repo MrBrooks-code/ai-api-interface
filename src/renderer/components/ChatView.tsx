@@ -16,6 +16,7 @@ import type { LoginBanner } from '../../shared/types';
 const DEFAULT_BANNER: LoginBanner = {
   title: 'Bedrock Chat',
   message: 'Chat with Claude Sonnet 4.5 via Amazon Bedrock',
+  titlebar: 'Bedrock Chat',
 };
 
 /** Displays the conversation messages or the logon banner when idle. */

@@ -14,6 +14,7 @@ const DEFAULT_CONFIG: AdminConfig = {
   loginBanner: {
     title: 'Bedrock Chat',
     message: 'Chat with Claude Sonnet 4.5 via Amazon Bedrock',
+    titlebar: 'Bedrock Chat',
   },
 };
 
@@ -50,6 +51,10 @@ export function getAdminConfig(): AdminConfig {
           typeof parsed?.loginBanner?.message === 'string'
             ? parsed.loginBanner.message
             : DEFAULT_CONFIG.loginBanner.message,
+        titlebar:
+          typeof parsed?.loginBanner?.titlebar === 'string'
+            ? parsed.loginBanner.titlebar
+            : DEFAULT_CONFIG.loginBanner.titlebar,
       },
     };
   } catch {
