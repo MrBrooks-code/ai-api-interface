@@ -4,7 +4,7 @@
  * sidebar connection status button.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProfileSelector from './ProfileSelector';
 import SsoWizard from './SsoWizard';
 import { useSettings } from '../hooks/useSettings';
@@ -33,6 +33,8 @@ export default function SettingsPanel() {
   const setShowSettings = useChatStore((s) => s.setShowSettings);
   const theme = useChatStore((s) => s.theme);
   const setTheme = useChatStore((s) => s.setTheme);
+  const systemPrompt = useChatStore((s) => s.systemPrompt);
+  const setSystemPrompt = useChatStore((s) => s.setSystemPrompt);
   const {
     profiles,
     connectionStatus,
@@ -67,6 +69,17 @@ export default function SettingsPanel() {
   const [profileRegion, setProfileRegion] = useState(
     connectionStatus.region ?? defaultRegion
   );
+
+  // System prompt local state — initialized from store, saved on blur
+  const [localSystemPrompt, setLocalSystemPrompt] = useState(systemPrompt);
+  useEffect(() => {
+    setLocalSystemPrompt(systemPrompt);
+  }, [systemPrompt]);
+
+  const handleSystemPromptBlur = () => {
+    setSystemPrompt(localSystemPrompt);
+    ipc.setSetting('systemPrompt', localSystemPrompt);
+  };
 
   // Custom model ID input
   const [customModelId, setCustomModelId] = useState('');
@@ -177,6 +190,22 @@ export default function SettingsPanel() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* System Prompt */}
+              <div className="space-y-2 pt-2 border-t border-surface-lighter">
+                <h3 className="text-xs font-medium text-text-muted uppercase tracking-wide">System Prompt</h3>
+                <textarea
+                  value={localSystemPrompt}
+                  onChange={(e) => setLocalSystemPrompt(e.target.value)}
+                  onBlur={handleSystemPromptBlur}
+                  placeholder="Enter a system prompt to shape model behavior..."
+                  rows={4}
+                  className="w-full bg-surface rounded-lg px-3 py-2 text-sm text-text border border-surface-lighter focus:border-primary outline-none resize-y"
+                />
+                <p className="text-xs text-text-dim">
+                  Give your AI a persona or instructions to follow in every conversation.
+                </p>
               </div>
 
               {/* Data */}

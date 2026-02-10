@@ -32,6 +32,7 @@ export function applyThemeClass(themeId: ThemeId) {
 export default function App() {
   const showSettings = useChatStore((s) => s.showSettings);
   const setTheme = useChatStore((s) => s.setTheme);
+  const setSystemPrompt = useChatStore((s) => s.setSystemPrompt);
 
   useEffect(() => {
     ipc.getSetting('theme').then((saved) => {
@@ -40,6 +41,11 @@ export default function App() {
         : 'catppuccin-mocha';
       setTheme(theme);
       applyThemeClass(theme);
+    });
+    ipc.getSetting('systemPrompt').then((saved) => {
+      if (typeof saved === 'string' && saved.length > 0) {
+        setSystemPrompt(saved);
+      }
     });
   }, []);
 

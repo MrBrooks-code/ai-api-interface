@@ -135,9 +135,11 @@ export function useChat() {
     useChatStore.getState().addMessage(newAssistantMsg);
 
     // Start new stream with history that does NOT include the placeholder
+    const toolLoopSystemPrompt = useChatStore.getState().systemPrompt;
     const { requestId } = await ipc.sendMessage({
       conversationId: assistantMessage.conversationId,
       messages: messagesForApi,
+      system: toolLoopSystemPrompt || undefined,
     });
 
     useChatStore.getState().setStreaming(true, requestId, newAssistantMsg.id);
@@ -178,9 +180,11 @@ export function useChat() {
       useChatStore.getState().addMessage(assistantMessage);
 
       // Start streaming — send only the real messages, not the placeholder
+      const systemPrompt = useChatStore.getState().systemPrompt;
       const { requestId } = await ipc.sendMessage({
         conversationId,
         messages: messagesForApi,
+        system: systemPrompt || undefined,
       });
 
       useChatStore.getState().setStreaming(true, requestId, assistantMessage.id);

@@ -9,6 +9,12 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { ChatMessage, ContentBlock, Conversation, ConnectionStatus, BedrockModel, ThemeId } from '../../shared/types';
 
+/** Default system prompt used when the user hasn't customized one yet. */
+export const DEFAULT_SYSTEM_PROMPT =
+  'You are a helpful, accurate, and concise AI assistant. ' +
+  'Provide clear and well-structured responses. ' +
+  'If you are unsure about something, say so rather than guessing.';
+
 /** Shape of the global application store. */
 interface ChatState {
   // Connection
@@ -49,6 +55,10 @@ interface ChatState {
   // Theme
   theme: ThemeId;
   setTheme: (theme: ThemeId) => void;
+
+  // System prompt
+  systemPrompt: string;
+  setSystemPrompt: (prompt: string) => void;
 
   // Settings panel
   showSettings: boolean;
@@ -212,6 +222,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Theme
   theme: 'catppuccin-mocha' as ThemeId,
   setTheme: (theme) => set({ theme }),
+
+  // System prompt
+  systemPrompt: DEFAULT_SYSTEM_PROMPT,
+  setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
 
   // Settings panel
   showSettings: false,
