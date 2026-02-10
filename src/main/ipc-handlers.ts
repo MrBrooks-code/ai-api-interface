@@ -16,6 +16,7 @@ import {
   getRegion,
   getSsoConfigId,
   getSsoConfigName,
+  disconnect,
 } from './credential-manager';
 import {
   performSsoDeviceAuth,
@@ -112,8 +113,14 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC.SSO_DELETE_CONFIG, (_event, id: string) => {
+    // If the deleted config is the active connection, disconnect first
+    // to zeroize credentials and prevent a stale session (security).
+    const wasActive = getSsoConfigId() === id;
     deleteSsoConfig(id);
-    return { success: true };
+    if (wasActive) {
+      disconnect();
+    }
+    return { success: true, wasActive };
   });
 
   ipcMain.handle(IPC.SSO_START_DEVICE_AUTH, async (event, startUrl: string, region: string) => {

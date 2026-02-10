@@ -85,9 +85,14 @@ export function useSettings() {
   }, []);
 
   const deleteSsoConfig = useCallback(async (id: string) => {
-    await ipc.deleteSsoConfig(id);
+    const result = await ipc.deleteSsoConfig(id);
     setSsoConfigs((prev) => prev.filter((c) => c.id !== id));
-  }, []);
+    // If the deleted config was the active connection, the main process
+    // disconnected. Refresh status so the UI reflects the change.
+    if (result.wasActive) {
+      await checkConnectionStatus();
+    }
+  }, [checkConnectionStatus]);
 
   const connectWithSsoConfig = useCallback(async (configId: string) => {
     setLoading(true);

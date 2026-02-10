@@ -334,7 +334,11 @@ export default function SettingsPanel() {
                               Connect
                             </button>
                             <button
-                              onClick={() => deleteSsoConfig(config.id)}
+                              onClick={() => {
+                                if (window.confirm('Are you sure you want to delete this SSO profile?')) {
+                                  deleteSsoConfig(config.id);
+                                }
+                              }}
                               className="px-2 py-1.5 rounded-lg text-xs text-accent-red hover:bg-accent-red/10 transition-colors"
                             >
                               Delete

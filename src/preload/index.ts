@@ -53,7 +53,7 @@ const electronAPI = {
   saveSsoConfig: (config: SsoConfiguration): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC.SSO_SAVE_CONFIG, config),
 
-  deleteSsoConfig: (id: string): Promise<{ success: boolean }> =>
+  deleteSsoConfig: (id: string): Promise<{ success: boolean; wasActive: boolean }> =>
     ipcRenderer.invoke(IPC.SSO_DELETE_CONFIG, id),
 
   startSsoDeviceAuth: (startUrl: string, region: string): Promise<{ success: boolean; error?: string }> =>
