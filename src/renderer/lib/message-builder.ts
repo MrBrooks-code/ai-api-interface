@@ -1,9 +1,17 @@
+/**
+ * @fileoverview Factory functions for constructing {@link ContentBlock} arrays
+ * from user input and uploaded files. Used by the chat hook to build the
+ * message payload before sending to the main process.
+ */
+
 import type { ContentBlock, UploadedFile } from '../../shared/types';
 
+/** Creates a plain text content block. */
 export function buildTextBlock(text: string): ContentBlock {
   return { type: 'text', text };
 }
 
+/** Creates an image content block from an uploaded file. */
 export function buildImageBlock(file: UploadedFile): ContentBlock {
   return {
     type: 'image',
@@ -13,6 +21,7 @@ export function buildImageBlock(file: UploadedFile): ContentBlock {
   };
 }
 
+/** Creates a document content block from an uploaded file. */
 export function buildDocumentBlock(file: UploadedFile): ContentBlock {
   return {
     type: 'document',
@@ -22,6 +31,7 @@ export function buildDocumentBlock(file: UploadedFile): ContentBlock {
   };
 }
 
+/** Creates a tool result block to feed back to the model after tool execution. */
 export function buildToolResultBlock(
   toolUseId: string,
   content: string,
@@ -30,6 +40,7 @@ export function buildToolResultBlock(
   return { type: 'toolResult', toolUseId, content, status };
 }
 
+/** Routes an uploaded file to the appropriate image or document block builder. */
 export function fileToContentBlock(file: UploadedFile): ContentBlock {
   if (file.type === 'image') {
     return buildImageBlock(file);
@@ -37,6 +48,10 @@ export function fileToContentBlock(file: UploadedFile): ContentBlock {
   return buildDocumentBlock(file);
 }
 
+/**
+ * Assembles a complete user message content array from text and optional files.
+ * File blocks are placed before the text block so the model sees attachments first.
+ */
 export function buildUserContent(
   text: string,
   files: UploadedFile[] = []

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Chat hook that manages message sending, stream event handling,
+ * and the automatic tool-use loop. Subscribes to stream events from the main
+ * process and accumulates response tokens into the Zustand store.
+ */
+
 import { useCallback, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatStore } from '../stores/chat-store';

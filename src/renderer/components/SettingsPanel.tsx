@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Full-screen modal presenting General (theme, data wipe) and
+ * Connection (AWS profile / SSO, model selection) settings. Opened from the
+ * sidebar connection status button.
+ */
+
 import React, { useState } from 'react';
 import ProfileSelector from './ProfileSelector';
 import SsoWizard from './SsoWizard';
@@ -8,8 +14,10 @@ import { ipc } from '../lib/ipc-client';
 import { applyThemeClass } from '../App';
 import type { ThemeId } from '../../shared/types';
 
+/** Top-level tab selection in the settings panel. */
 type TopTab = 'general' | 'connection';
 
+/** Available color themes mapped to user-facing labels. */
 const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
   { id: 'catppuccin-mocha', label: 'Midnight' },
   { id: 'catppuccin-latte', label: 'Cloud' },
@@ -20,6 +28,7 @@ const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
   { id: 'solarized-light', label: 'Daylight' },
 ];
 
+/** Modal dialog for application and connection settings. */
 export default function SettingsPanel() {
   const setShowSettings = useChatStore((s) => s.setShowSettings);
   const theme = useChatStore((s) => s.theme);

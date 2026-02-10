@@ -1,3 +1,13 @@
+/**
+ * @fileoverview IPC channel name constants shared between main, preload, and
+ * renderer processes. Every Electron IPC call references a channel from this
+ * map to prevent string-literal drift across the process boundary.
+ */
+
+/**
+ * Exhaustive map of IPC channel names used by `ipcMain.handle()` and
+ * `ipcRenderer.invoke()`. Channels are grouped by feature domain.
+ */
 export const IPC = {
   // AWS credential management
   AWS_LIST_PROFILES: 'aws:list-profiles',
@@ -47,4 +57,5 @@ export const IPC = {
   SETTINGS_WIPE_DATA: 'settings:wipe-data',
 } as const;
 
+/** Union of all valid IPC channel name strings. */
 export type IpcChannel = (typeof IPC)[keyof typeof IPC];

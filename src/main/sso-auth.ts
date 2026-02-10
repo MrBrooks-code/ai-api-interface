@@ -1,3 +1,11 @@
+/**
+ * @fileoverview AWS SSO (IAM Identity Center) device authorization flow and
+ * token caching. Implements OIDC device auth per the AWS SSO specification:
+ * RegisterClient → StartDeviceAuthorization → poll CreateToken → cache.
+ * Tokens are cached to `~/.aws/sso/cache/` with `0o600` permissions,
+ * matching the AWS CLI convention.
+ */
+
 import {
   SSOOIDCClient,
   RegisterClientCommand,

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Electron preload script. Exposes a typed API to the renderer
+ * via `contextBridge.exposeInMainWorld()`. This is the only bridge between the
+ * sandboxed renderer and the main process — all IPC calls are enumerated here.
+ */
+
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC } from '../shared/ipc-channels';
 import type {

@@ -1,12 +1,19 @@
+/**
+ * @fileoverview Dropdown selector that groups discovered AWS profiles into
+ * SSO and static-credential categories with session status indicators.
+ */
+
 import React from 'react';
 import type { AwsProfile } from '../../shared/types';
 
+/** Props accepted by {@link ProfileSelector}. */
 interface Props {
   profiles: AwsProfile[];
   selected: string;
   onSelect: (name: string) => void;
 }
 
+/** Grouped dropdown for choosing an AWS CLI profile. */
 export default function ProfileSelector({ profiles, selected, onSelect }: Props) {
   if (profiles.length === 0) {
     return (

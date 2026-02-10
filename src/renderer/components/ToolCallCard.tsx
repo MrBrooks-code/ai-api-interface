@@ -1,18 +1,27 @@
+/**
+ * @fileoverview Collapsible card that displays either a tool invocation
+ * (name + JSON input) or a tool result (success/error status + output).
+ */
+
 import React, { useState } from 'react';
 import type { ToolUseBlock, ToolResultBlock } from '../../shared/types';
 
+/** Props for rendering a tool invocation request. */
 interface CallProps {
   block: ToolUseBlock;
   type: 'call';
 }
 
+/** Props for rendering a tool execution result. */
 interface ResultProps {
   block: ToolResultBlock;
   type: 'result';
 }
 
+/** Discriminated union of call and result props. */
 type Props = CallProps | ResultProps;
 
+/** Expandable card showing tool call details or execution results. */
 export default function ToolCallCard({ block, type }: Props) {
   const [expanded, setExpanded] = useState(false);
 

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Settings and connection management hook. Handles AWS profile
+ * listing, SSO configuration CRUD, model discovery, and connection lifecycle.
+ * Listens for SSO device-auth progress events pushed from the main process.
+ */
+
 import { useCallback, useEffect, useState } from 'react';
 import { useChatStore } from '../stores/chat-store';
 import { ipc } from '../lib/ipc-client';

@@ -1,8 +1,15 @@
+/**
+ * @fileoverview Reads the IT-managed `admin-config.json` from the application's
+ * resources directory. The config is read once on first access and cached in
+ * memory. If the file is missing or malformed, sensible defaults are returned.
+ */
+
 import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import type { AdminConfig } from '../shared/types';
 
+/** Fallback values used when the config file is absent or fields are invalid. */
 const DEFAULT_CONFIG: AdminConfig = {
   loginBanner: {
     title: 'Bedrock Chat',
@@ -12,6 +19,7 @@ const DEFAULT_CONFIG: AdminConfig = {
 
 let cachedConfig: AdminConfig | null = null;
 
+/** Resolves the path to `admin-config.json` for packaged and development builds. */
 function resolveConfigPath(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, 'resources', 'admin-config.json');
@@ -19,6 +27,11 @@ function resolveConfigPath(): string {
   return path.join(app.getAppPath(), 'resources', 'admin-config.json');
 }
 
+/**
+ * Returns the admin configuration, reading from disk on first call.
+ * Individual fields are validated and fall back to defaults independently,
+ * so a partial config (e.g. only `title` set) still works.
+ */
 export function getAdminConfig(): AdminConfig {
   if (cachedConfig) return cachedConfig;
 

@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Root application component. Renders the top-level layout
+ * (title bar, sidebar, chat view, settings modal) and restores the persisted
+ * color theme on mount.
+ */
+
 import React, { useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatView from './components/ChatView';
@@ -6,17 +12,23 @@ import { useChatStore } from './stores/chat-store';
 import { ipc } from './lib/ipc-client';
 import type { ThemeId } from '../shared/types';
 
+/** Theme identifiers the app recognizes when restoring a saved preference. */
 const VALID_THEMES: ThemeId[] = [
   'catppuccin-mocha', 'catppuccin-latte', 'nord', 'tokyo-night',
   'rose-pine', 'gruvbox-dark', 'solarized-light',
 ];
 
+/**
+ * Replaces the active `theme-*` CSS class on the document root element.
+ * Called on startup and whenever the user changes the theme in settings.
+ */
 export function applyThemeClass(themeId: ThemeId) {
   const el = document.documentElement;
   el.className = el.className.replace(/\btheme-\S+/g, '').trim();
   el.classList.add(`theme-${themeId}`);
 }
 
+/** Root shell that composes the sidebar, chat area, and settings modal. */
 export default function App() {
   const showSettings = useChatStore((s) => s.showSettings);
   const setTheme = useChatStore((s) => s.setTheme);

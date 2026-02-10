@@ -1,21 +1,31 @@
+/**
+ * @fileoverview Previews an uploaded file (thumbnail + name in the input bar)
+ * or renders an inline image from a message's {@link ImageBlock}.
+ */
+
 import React, { useMemo } from 'react';
 import type { ImageBlock, UploadedFile } from '../../shared/types';
 
+/** Props for previewing an attached file before sending. */
 interface FileProps {
   file: UploadedFile;
   onRemove?: () => void;
 }
 
+/** Props for rendering an image already present in a message. */
 interface BlockProps {
   block: ImageBlock;
 }
 
+/** Discriminated union — either an attached file or an in-message image block. */
 type Props = FileProps | BlockProps;
 
+/** Type guard distinguishing file-based props from block-based props. */
 function isFileProps(props: Props): props is FileProps {
   return 'file' in props;
 }
 
+/** Renders a file attachment thumbnail or an inline image block. */
 export default function FilePreview(props: Props) {
   if (isFileProps(props)) {
     return <FilePreviewFromFile file={props.file} onRemove={props.onRemove} />;

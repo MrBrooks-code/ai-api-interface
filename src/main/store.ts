@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Local SQLite persistence layer. Manages conversations, messages,
+ * SSO configurations, and application settings. All queries use parameterized
+ * statements to prevent SQL injection. The database uses WAL journal mode for
+ * concurrency and foreign key constraints for referential integrity.
+ */
+
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import path from 'path';
@@ -5,6 +12,7 @@ import type { Conversation, ChatMessage, ContentBlock, SsoConfiguration } from '
 
 let db: Database.Database;
 
+/** Opens the SQLite database and creates tables if they don't exist. */
 export function initStore() {
   const dbPath = path.join(app.getPath('userData'), 'bedrock-chat.db');
   db = new Database(dbPath);
@@ -52,6 +60,7 @@ export function initStore() {
   `);
 }
 
+/** Returns all conversations, most recently updated first. */
 export function listConversations(): Conversation[] {
   const rows = db
     .prepare('SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC')
@@ -65,6 +74,7 @@ export function listConversations(): Conversation[] {
   }));
 }
 
+/** Returns a single conversation by ID, or `null` if not found. */
 export function getConversation(id: string): Conversation | null {
   const row = db
     .prepare('SELECT id, title, created_at, updated_at FROM conversations WHERE id = ?')
@@ -79,6 +89,7 @@ export function getConversation(id: string): Conversation | null {
   };
 }
 
+/** Inserts a new conversation and returns the created record. */
 export function createConversation(id: string, title: string): Conversation {
   const now = Date.now();
   db.prepare('INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)')
@@ -87,15 +98,22 @@ export function createConversation(id: string, title: string): Conversation {
   return { id, title, createdAt: now, updatedAt: now };
 }
 
+/** Deletes a conversation and its messages (via foreign key cascade). */
 export function deleteConversation(id: string): void {
   db.prepare('DELETE FROM conversations WHERE id = ?').run(id);
 }
 
+/** Updates a conversation's title and bumps its `updated_at` timestamp. */
 export function updateConversationTitle(id: string, title: string): void {
   db.prepare('UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?')
     .run(title, Date.now(), id);
 }
 
+/**
+ * Persists a chat message. `Uint8Array` content (images, documents) is
+ * serialized to base64 for JSON storage. Also bumps the parent conversation's
+ * `updated_at` timestamp.
+ */
 export function saveMessage(message: ChatMessage): void {
   const contentJson = JSON.stringify(message.content, (_key, value) => {
     // Convert Uint8Array to base64 for storage
@@ -114,6 +132,7 @@ export function saveMessage(message: ChatMessage): void {
     .run(message.timestamp, message.conversationId);
 }
 
+/** Returns all messages for a conversation in chronological order. */
 export function getMessages(conversationId: string): ChatMessage[] {
   const rows = db
     .prepare('SELECT id, conversation_id, role, content, timestamp, stop_reason FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC')
@@ -143,6 +162,7 @@ export function getMessages(conversationId: string): ChatMessage[] {
 
 // --- SSO Configs ---
 
+/** Raw SQLite row shape for the `sso_configs` table. */
 interface SsoConfigRow {
   id: string;
   name: string;
@@ -156,6 +176,7 @@ interface SsoConfigRow {
   updated_at: number;
 }
 
+/** Maps a database row to the application-level {@link SsoConfiguration} shape. */
 function rowToSsoConfig(r: SsoConfigRow): SsoConfiguration {
   return {
     id: r.id,
@@ -171,6 +192,7 @@ function rowToSsoConfig(r: SsoConfigRow): SsoConfiguration {
   };
 }
 
+/** Returns all saved SSO configurations, most recently updated first. */
 export function listSsoConfigs(): SsoConfiguration[] {
   const rows = db
     .prepare('SELECT * FROM sso_configs ORDER BY updated_at DESC')
@@ -178,6 +200,7 @@ export function listSsoConfigs(): SsoConfiguration[] {
   return rows.map(rowToSsoConfig);
 }
 
+/** Returns a single SSO configuration by ID, or `null` if not found. */
 export function getSsoConfig(id: string): SsoConfiguration | null {
   const row = db
     .prepare('SELECT * FROM sso_configs WHERE id = ?')
@@ -185,6 +208,7 @@ export function getSsoConfig(id: string): SsoConfiguration | null {
   return row ? rowToSsoConfig(row) : null;
 }
 
+/** Inserts or replaces an SSO configuration. */
 export function saveSsoConfig(config: SsoConfiguration): void {
   db.prepare(
     `INSERT OR REPLACE INTO sso_configs
@@ -204,12 +228,14 @@ export function saveSsoConfig(config: SsoConfiguration): void {
   );
 }
 
+/** Deletes an SSO configuration by ID. */
 export function deleteSsoConfig(id: string): void {
   db.prepare('DELETE FROM sso_configs WHERE id = ?').run(id);
 }
 
 // --- App Settings ---
 
+/** Retrieves a setting value by key, or `null` if unset. */
 export function getSetting(key: string): string | null {
   const row = db
     .prepare('SELECT value FROM app_settings WHERE key = ?')
@@ -217,10 +243,12 @@ export function getSetting(key: string): string | null {
   return row?.value ?? null;
 }
 
+/** Inserts or updates a setting key-value pair. */
 export function setSetting(key: string, value: string): void {
   db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(key, value);
 }
 
+/** Permanently deletes all messages, conversations, and SSO configurations. */
 export function wipeAllData(): void {
   db.exec('DELETE FROM messages');
   db.exec('DELETE FROM conversations');

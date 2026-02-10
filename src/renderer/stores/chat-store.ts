@@ -1,7 +1,15 @@
+/**
+ * @fileoverview Central Zustand store for application state. Holds connection
+ * status, conversations, messages, streaming state, model selection, theme
+ * preference, and UI flags. Streaming content is accumulated incrementally
+ * as delta events arrive from the main process.
+ */
+
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { ChatMessage, ContentBlock, Conversation, ConnectionStatus, BedrockModel, ThemeId } from '../../shared/types';
 
+/** Shape of the global application store. */
 interface ChatState {
   // Connection
   connectionStatus: ConnectionStatus;
@@ -54,6 +62,7 @@ interface ChatState {
   ) => ChatMessage;
 }
 
+/** Global Zustand store consumed by all React components and hooks. */
 export const useChatStore = create<ChatState>((set, get) => ({
   // Connection
   connectionStatus: { connected: false },

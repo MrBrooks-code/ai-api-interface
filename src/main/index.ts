@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Electron main process entry point. Creates the application
+ * window, initializes the SQLite store, and registers IPC handlers. The
+ * renderer is loaded from the Vite dev server in development or from the
+ * built `dist/` directory in production.
+ */
+
 import { app, BrowserWindow, shell } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
@@ -9,6 +16,7 @@ const DIST_ELECTRON = path.join(__dirname, '..');
 const DIST = path.join(DIST_ELECTRON, '../dist');
 const PRELOAD = path.join(DIST_ELECTRON, 'preload/index.js');
 
+/** Creates and configures the main BrowserWindow with security-hardened web preferences. */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -67,6 +75,7 @@ app.on('window-all-closed', () => {
   app.quit();
 });
 
+/** Returns the main window instance, or `null` if it has been closed. */
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }

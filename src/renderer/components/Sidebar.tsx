@@ -1,7 +1,13 @@
+/**
+ * @fileoverview Left sidebar listing saved conversations, a "New Chat" button,
+ * and the current AWS connection status indicator at the bottom.
+ */
+
 import React from 'react';
 import { useConversations } from '../hooks/useConversations';
 import { useChatStore } from '../stores/chat-store';
 
+/** Navigation sidebar with conversation history and connection status. */
 export default function Sidebar() {
   const { conversations, activeConversationId, loadMessages, createConversation, deleteConversation } =
     useConversations();

@@ -1,5 +1,8 @@
-// Typed wrapper around window.electronAPI for convenience
-// Re-exports the API so components don't need to access window directly
+/**
+ * @fileoverview Typed wrapper around `window.electronAPI`. Components and hooks
+ * import {@link ipc} instead of accessing the global directly, keeping IPC
+ * usage centralized and refactorable.
+ */
 
 function getAPI() {
   return window.electronAPI;

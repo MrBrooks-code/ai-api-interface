@@ -1,15 +1,23 @@
+/**
+ * @fileoverview Single message bubble that delegates rendering of each
+ * content block to the appropriate sub-component (markdown, tool call,
+ * image, or document preview).
+ */
+
 import React from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 import ToolCallCard from './ToolCallCard';
 import FilePreview from './FilePreview';
 import type { ChatMessage, ContentBlock } from '../../shared/types';
 
+/** Props accepted by {@link MessageBubble}. */
 interface Props {
   message: ChatMessage;
   isLast: boolean;
   isStreaming: boolean;
 }
 
+/** Routes a single content block to the correct visual component. */
 function renderBlock(block: ContentBlock, index: number) {
   switch (block.type) {
     case 'text':
@@ -42,6 +50,7 @@ function renderBlock(block: ContentBlock, index: number) {
   }
 }
 
+/** Renders a single chat message with alignment based on role. */
 export default function MessageBubble({ message, isStreaming }: Props) {
   const isUser = message.role === 'user';
 

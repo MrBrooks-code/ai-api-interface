@@ -1,12 +1,19 @@
+/**
+ * @fileoverview Scrollable message list that auto-scrolls to the latest
+ * message when new content arrives or while the assistant is streaming.
+ */
+
 import React, { useEffect, useRef } from 'react';
 import MessageBubble from './MessageBubble';
 import type { ChatMessage } from '../../shared/types';
 
+/** Props accepted by {@link MessageList}. */
 interface Props {
   messages: ChatMessage[];
   isStreaming: boolean;
 }
 
+/** Renders a vertically scrolling list of {@link MessageBubble} components. */
 export default function MessageList({ messages, isStreaming }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 

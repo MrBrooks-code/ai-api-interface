@@ -1,17 +1,26 @@
+/**
+ * @fileoverview Multi-step wizard for configuring a new SSO connection.
+ * Guides the user through device-auth login, account selection, role
+ * selection, Bedrock region, and saving the configuration.
+ */
+
 import React, { useState } from 'react';
 import { ipc } from '../lib/ipc-client';
 import { ALL_REGIONS } from '../../shared/constants';
 import type { SsoLoginStatus, SsoAccount, SsoRole, SsoConfiguration } from '../../shared/types';
 import { v4 as uuid } from 'uuid';
 
+/** Sequential step identifiers for the SSO setup wizard. */
 type WizardStep = 'url' | 'auth' | 'account' | 'role' | 'region' | 'save';
 
+/** Props accepted by {@link SsoWizard}. */
 interface SsoWizardProps {
   onClose: () => void;
   onSaved: (config: SsoConfiguration) => void;
   ssoStatus: SsoLoginStatus | null;
 }
 
+/** Step-by-step modal wizard for creating a saved SSO configuration. */
 export default function SsoWizard({ onClose, onSaved, ssoStatus }: SsoWizardProps) {
   const [step, setStep] = useState<WizardStep>('url');
   const [error, setError] = useState<string | null>(null);

@@ -1,3 +1,10 @@
+/**
+ * @fileoverview AWS credential resolution and session state. Credentials are
+ * held exclusively in this module's closure — they are never serialized or
+ * sent to the renderer process. Supports connection via local AWS profiles
+ * (SSO or static) and saved SSO configurations.
+ */
+
 import { fromIni, fromSSO } from '@aws-sdk/credential-providers';
 import { loadSharedConfigFiles } from '@smithy/shared-ini-file-loader';
 import type { AwsCredentialIdentity } from '@aws-sdk/types';
@@ -18,6 +25,11 @@ let currentRegion: string | null = null;
 let currentSsoConfigId: string | null = null;
 let currentSsoConfigName: string | null = null;
 
+/**
+ * Discovers AWS profiles from `~/.aws/config` and `~/.aws/credentials`.
+ * Each profile is annotated with whether it uses SSO and whether a cached
+ * SSO token is available.
+ */
 export async function listProfiles(): Promise<AwsProfile[]> {
   try {
     const configFiles = await loadSharedConfigFiles();
@@ -127,30 +139,41 @@ export async function connectWithSsoConfig(
   currentSsoConfigName = config.name;
 }
 
+/** Returns the currently resolved credentials, or `null` if not connected. */
 export function getCredentials(): AwsCredentialIdentity | null {
   return resolvedCredentials;
 }
 
+/** Returns the AWS region for the active connection. */
 export function getRegion(): string | null {
   return currentRegion;
 }
 
+/** Returns the AWS profile name used for the active connection, if any. */
 export function getProfileName(): string | null {
   return currentProfile;
 }
 
+/** Returns the saved SSO configuration ID used for the active connection, if any. */
 export function getSsoConfigId(): string | null {
   return currentSsoConfigId;
 }
 
+/** Returns the display name of the saved SSO configuration, if any. */
 export function getSsoConfigName(): string | null {
   return currentSsoConfigName;
 }
 
+/** Returns `true` if credentials have been resolved and are held in memory. */
 export function isConnected(): boolean {
   return resolvedCredentials !== null;
 }
 
+/**
+ * Clears the active session. Credential values are overwritten with empty
+ * strings before the reference is released (best-effort zeroization for
+ * defense-in-depth — see SI-F02 in SECURITY-REVIEW.MD).
+ */
 export function disconnect(): void {
   if (resolvedCredentials) {
     // Overwrite credential values before clearing reference (best-effort zeroization).

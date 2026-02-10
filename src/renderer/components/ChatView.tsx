@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Primary chat view containing the message list, input bar, and
+ * the admin-configurable logon banner (CMMC AC.L2-3.1.9) shown when no
+ * conversation is active.
+ */
+
 import React, { useEffect, useState } from 'react';
 import MessageList from './MessageList';
 import InputBar from './InputBar';
@@ -6,11 +12,13 @@ import { useChatStore } from '../stores/chat-store';
 import { ipc } from '../lib/ipc-client';
 import type { LoginBanner } from '../../shared/types';
 
+/** Fallback banner shown when `admin-config.json` is missing or unreadable. */
 const DEFAULT_BANNER: LoginBanner = {
   title: 'Bedrock Chat',
   message: 'Chat with Claude Sonnet 4.5 via Amazon Bedrock',
 };
 
+/** Displays the conversation messages or the logon banner when idle. */
 export default function ChatView() {
   const { messages, isStreaming, sendMessage, abortStream } = useChat();
   const connectionStatus = useChatStore((s) => s.connectionStatus);

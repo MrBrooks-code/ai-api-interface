@@ -1,3 +1,10 @@
+/**
+ * @fileoverview Registers all `ipcMain.handle()` handlers that the renderer
+ * calls via `ipcRenderer.invoke()`. Each handler maps an IPC channel to a
+ * main-process function. This is the sole entry point for renderer-to-main
+ * communication.
+ */
+
 import { ipcMain, BrowserWindow } from 'electron';
 import { IPC } from '../shared/ipc-channels';
 import {
@@ -42,6 +49,7 @@ import type { SsoConfiguration } from '../shared/types';
 // Module-level token held securely in main process — never sent to renderer
 let pendingWizardToken: DeviceAuthResult | null = null;
 
+/** Registers all IPC channel handlers. Called once during app initialization. */
 export function registerIpcHandlers() {
   // --- AWS Credentials ---
 

@@ -1,8 +1,14 @@
+/**
+ * @fileoverview Chat input bar with an auto-resizing textarea, file attachment
+ * support, and send/stop streaming controls.
+ */
+
 import React, { useState, useRef, useCallback } from 'react';
 import FilePreview from './FilePreview';
 import { ipc } from '../lib/ipc-client';
 import type { UploadedFile } from '../../shared/types';
 
+/** Props accepted by {@link InputBar}. */
 interface Props {
   onSend: (text: string, files?: UploadedFile[]) => void;
   onAbort: () => void;
@@ -10,6 +16,7 @@ interface Props {
   disabled: boolean;
 }
 
+/** Composable input area for composing messages and attaching files. */
 export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Props) {
   const [text, setText] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);

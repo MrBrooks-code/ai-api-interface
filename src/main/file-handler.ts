@@ -1,3 +1,9 @@
+/**
+ * @fileoverview File dialog and validated file reading. Only paths explicitly
+ * selected by the user through the native dialog are readable — this prevents
+ * a compromised renderer from requesting arbitrary file access (AC-F03).
+ */
+
 import { dialog } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -6,6 +12,7 @@ import type { UploadedFile } from '../shared/types';
 /** Tracks file paths the user has explicitly selected via the open dialog. */
 const allowedPaths = new Set<string>();
 
+/** Map of image file extensions to Bedrock-compatible format identifiers. */
 const IMAGE_EXTENSIONS: Record<string, string> = {
   '.png': 'png',
   '.jpg': 'jpeg',
@@ -14,6 +21,7 @@ const IMAGE_EXTENSIONS: Record<string, string> = {
   '.webp': 'webp',
 };
 
+/** Map of document file extensions to Bedrock-compatible format identifiers. */
 const DOCUMENT_EXTENSIONS: Record<string, string> = {
   '.pdf': 'pdf',
   '.csv': 'csv',
@@ -26,6 +34,10 @@ const DOCUMENT_EXTENSIONS: Record<string, string> = {
   '.md': 'md',
 };
 
+/**
+ * Opens the native file picker and registers selected paths as allowed.
+ * @returns Array of selected file paths, or empty if the dialog was cancelled.
+ */
 export async function openFileDialog(): Promise<string[]> {
   const allExtensions = [
     ...Object.keys(IMAGE_EXTENSIONS),
@@ -49,8 +61,14 @@ export async function openFileDialog(): Promise<string[]> {
   return result.filePaths;
 }
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+/** Maximum allowed file size (50 MB). */
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
+/**
+ * Reads a file from disk after validating it was selected via the dialog.
+ * @param filePath Absolute path previously returned by {@link openFileDialog}.
+ * @throws If the path was not selected via the dialog or exceeds the size limit.
+ */
 export async function readFile(filePath: string): Promise<UploadedFile> {
   if (!allowedPaths.has(filePath)) {
     throw new Error('File access denied: path was not selected via the file dialog');

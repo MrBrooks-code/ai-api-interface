@@ -1,3 +1,9 @@
+/**
+ * @fileoverview Bedrock Converse API streaming. Sends messages to the model
+ * and forwards token-level stream events to the renderer via IPC. Each active
+ * stream is tracked by request ID so it can be individually aborted.
+ */
+
 import {
   ConverseStreamCommand,
   type Message,
@@ -13,6 +19,7 @@ import { IPC } from '../shared/ipc-channels';
 import type { SendMessageParams, ContentBlock, ToolDefinition } from '../shared/types';
 import { getToolDefinitions } from './tool-executor';
 
+/** Abort controllers keyed by request ID for in-flight streams. */
 const activeStreams = new Map<string, AbortController>();
 
 /** Sanitize a document name for the Bedrock Converse API:
@@ -29,6 +36,7 @@ function sanitizeDocName(raw: string): string {
   return cleaned || 'document';
 }
 
+/** Converts an application-level content block to the AWS SDK representation. */
 function contentBlockToSdk(
   block: ContentBlock,
   docNames: Map<string, number>
@@ -77,6 +85,7 @@ function contentBlockToSdk(
   }
 }
 
+/** Transforms the renderer's message array into SDK-compatible messages. */
 function buildMessages(params: SendMessageParams): Message[] {
   const docNames = new Map<string, number>();
   return params.messages.map((msg) => ({
@@ -85,6 +94,7 @@ function buildMessages(params: SendMessageParams): Message[] {
   }));
 }
 
+/** Builds the Converse API tool configuration from registered tool definitions. */
 function buildToolConfig(): { tools: Tool[] } | undefined {
   const defs: ToolDefinition[] = getToolDefinitions();
   if (defs.length === 0) return undefined;
@@ -99,6 +109,14 @@ function buildToolConfig(): { tools: Tool[] } | undefined {
   };
 }
 
+/**
+ * Sends a message to Bedrock via the Converse Streaming API and forwards
+ * each stream event to the renderer. Streaming runs in the background;
+ * the returned request ID can be used with {@link abortStream} to cancel.
+ * @param params Conversation messages and optional system prompt.
+ * @param window The BrowserWindow to push stream events to.
+ * @returns A unique request ID for this stream.
+ */
 export async function sendMessage(
   params: SendMessageParams,
   window: BrowserWindow
@@ -208,6 +226,10 @@ export async function sendMessage(
   return requestId;
 }
 
+/**
+ * Cancels an in-flight stream by its request ID.
+ * @returns `true` if the stream was found and aborted, `false` if already finished.
+ */
 export function abortStream(requestId: string): boolean {
   const controller = activeStreams.get(requestId);
   if (controller) {

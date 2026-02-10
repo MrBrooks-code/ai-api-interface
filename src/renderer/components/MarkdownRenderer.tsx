@@ -1,13 +1,20 @@
+/**
+ * @fileoverview Renders a markdown string with GitHub-Flavored Markdown
+ * tables/task lists and syntax-highlighted code fences via highlight.js.
+ */
+
 import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 
+/** Props accepted by {@link MarkdownRenderer}. */
 interface Props {
   content: string;
 }
 
+/** Renders a markdown string with GFM extensions and syntax highlighting. */
 export default function MarkdownRenderer({ content }: Props) {
   const plugins = useMemo(() => ({
     remarkPlugins: [remarkGfm],

@@ -1,7 +1,16 @@
+/**
+ * @fileoverview Conversation management hook. Provides CRUD operations for
+ * conversations and handles loading messages when switching between them.
+ */
+
 import { useCallback, useEffect } from 'react';
 import { useChatStore } from '../stores/chat-store';
 import { ipc } from '../lib/ipc-client';
 
+/**
+ * Manages conversations: create, delete, load messages, and switch active
+ * conversation. Loads the conversation list from the database on mount.
+ */
 export function useConversations() {
   const store = useChatStore();
 

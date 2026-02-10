@@ -1,17 +1,28 @@
+/**
+ * @fileoverview Built-in tool definitions and execution. Tools are registered
+ * at import time and made available to the Bedrock Converse API via
+ * {@link getToolDefinitions}. Expression evaluation uses a sandboxed parser
+ * (expr-eval) — no `Function()` or `eval()` is used (see SI-F01).
+ */
+
 import { Parser } from 'expr-eval';
 import type { ToolDefinition, ToolResult } from '../shared/types';
 
+/** Sandboxed math expression parser shared by the calculator tool. */
 const mathParser = new Parser();
 
+/** Internal registration entry pairing a tool schema with its executor. */
 interface ToolHandler {
   definition: ToolDefinition;
   execute: (input: Record<string, unknown>) => Promise<ToolResult>;
 }
 
+/** Registry of available tools, keyed by tool name. */
 const toolRegistry = new Map<string, ToolHandler>();
 
 // --- Built-in Tools ---
 
+/** Registers the default tools (current time, calculator) into the registry. */
 function registerBuiltinTools() {
   // Current date/time tool
   register({
@@ -70,14 +81,21 @@ function registerBuiltinTools() {
   });
 }
 
+/** Adds a tool handler to the registry. */
 function register(handler: ToolHandler) {
   toolRegistry.set(handler.definition.name, handler);
 }
 
+/** Returns the schema definitions for all registered tools. */
 export function getToolDefinitions(): ToolDefinition[] {
   return Array.from(toolRegistry.values()).map((h) => h.definition);
 }
 
+/**
+ * Executes a registered tool by name.
+ * @param name The tool name as defined in its schema.
+ * @param input The input object matching the tool's JSON Schema.
+ */
 export async function executeTool(
   name: string,
   input: Record<string, unknown>
