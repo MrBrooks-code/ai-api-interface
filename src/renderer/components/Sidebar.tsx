@@ -41,7 +41,7 @@ export default function Sidebar() {
       <div className="px-3 pt-2 pb-2">
         <button
           onClick={createConversation}
-          className="w-full px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors text-sm font-medium"
+          className="w-full px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/25 hover:text-text transition-colors text-sm font-medium"
         >
           + New Chat
         </button>
@@ -68,7 +68,7 @@ export default function Sidebar() {
             className={`group flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors ${
               convo.id === activeConversationId
                 ? 'bg-surface-lighter text-text'
-                : 'text-text-muted hover:bg-surface-lighter/50'
+                : 'text-text-muted hover:bg-primary/10 hover:text-text'
             }`}
             onClick={() => loadMessages(convo.id)}
           >
