@@ -7,6 +7,7 @@
 
 import { Parser } from 'expr-eval';
 import type { ToolDefinition, ToolResult } from '../shared/types';
+import { searchWeb, readWebpage } from './web-search';
 
 /** Sandboxed math expression parser shared by the calculator tool. */
 const mathParser = new Parser();
@@ -49,6 +50,59 @@ function registerBuiltinTools() {
       } catch {
         return { success: false, content: `Invalid timezone: ${tz}` };
       }
+    },
+  });
+
+  // Web search tool
+  register({
+    definition: {
+      name: 'web_search',
+      description:
+        'Search the web using DuckDuckGo for LIVE, up-to-date information. Returns titles, URLs, and snippets. IMPORTANT: These results are real-time from the internet and may contain information newer than your training data. Always trust search results over your internal knowledge when they conflict. Use read_webpage to get full details from a result URL.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The search query',
+          },
+          count: {
+            type: 'number',
+            description: 'Number of results to return (1-10, default 5)',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    execute: async (input) => {
+      const result = await searchWeb(
+        input.query as string,
+        input.count as number | undefined,
+      );
+      return { success: true, content: result };
+    },
+  });
+
+  // Webpage reader tool
+  register({
+    definition: {
+      name: 'read_webpage',
+      description:
+        'Fetch and read the text content of a webpage. Use this after web_search to get detailed information from a specific URL. Returns the page text stripped of HTML.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: {
+            type: 'string',
+            description: 'The full URL of the webpage to read',
+          },
+        },
+        required: ['url'],
+      },
+    },
+    execute: async (input) => {
+      const result = await readWebpage(input.url as string);
+      return { success: true, content: result };
     },
   });
 
