@@ -3,11 +3,16 @@
  * and the current AWS connection status indicator at the bottom.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useConversations } from '../hooks/useConversations';
 import { useChatStore } from '../stores/chat-store';
 import { ipc } from '../lib/ipc-client';
 import type { Conversation } from '../../shared/types';
+
+/** Minimum and maximum sidebar widths in pixels. */
+const MIN_WIDTH = 180;
+const MAX_WIDTH = 480;
+const DEFAULT_WIDTH = 256;
 
 /** Navigation sidebar with conversation history and connection status. */
 export default function Sidebar() {
@@ -18,6 +23,37 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Conversation[] | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // --- Resizable sidebar ---
+  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const isDragging = useRef(false);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging.current) return;
+    const clamped = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+    setWidth(clamped);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isDragging.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
+  const startResize = useCallback(() => {
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
 
   // Debounced search via IPC — searches titles and message content in SQLite
   useEffect(() => {
@@ -37,7 +73,10 @@ export default function Sidebar() {
   const displayedConversations = searchResults ?? conversations;
 
   return (
-    <aside className="w-64 bg-surface-light flex flex-col border-r border-surface-lighter flex-shrink-0">
+    <aside
+      className="relative bg-surface-light flex flex-col border-r border-surface-lighter flex-shrink-0"
+      style={{ width }}
+    >
       <div className="px-3 pt-2 pb-2">
         <button
           onClick={createConversation}
@@ -116,6 +155,11 @@ export default function Sidebar() {
           </span>
         </button>
       </div>
+      {/* Drag handle for resizing */}
+      <div
+        onMouseDown={startResize}
+        className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
+      />
     </aside>
   );
 }
