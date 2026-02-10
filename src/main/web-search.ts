@@ -173,7 +173,79 @@ function formatResults(query: string, results: SearchResult[]): string {
 const MAX_PAGE_TEXT_LENGTH = 8000;
 
 /** Maximum number of HTTP redirects to follow. */
-const MAX_REDIRECTS = 5;
+const MAX_REDIRECTS = 3;
+
+/** Maximum response body size in bytes (5 MB). */
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * IPv4 CIDR ranges that must never be fetched — prevents SSRF to internal
+ * networks, cloud metadata endpoints, and loopback interfaces.
+ */
+const BLOCKED_IPV4_RANGES: Array<{ prefix: number; mask: number }> = [
+  { prefix: 0x0A000000, mask: 0xFF000000 }, // 10.0.0.0/8
+  { prefix: 0xAC100000, mask: 0xFFF00000 }, // 172.16.0.0/12
+  { prefix: 0xC0A80000, mask: 0xFFFF0000 }, // 192.168.0.0/16
+  { prefix: 0x7F000000, mask: 0xFF000000 }, // 127.0.0.0/8
+  { prefix: 0xA9FE0000, mask: 0xFFFF0000 }, // 169.254.0.0/16 (link-local / AWS metadata)
+  { prefix: 0x00000000, mask: 0xFFFFFFFF }, // 0.0.0.0/32
+];
+
+/**
+ * Validates a URL for safe external fetching. Blocks private/internal IPs,
+ * non-HTTP(S) schemes, and localhost hostnames to prevent SSRF attacks.
+ *
+ * @throws {Error} If the URL is blocked or malformed.
+ */
+function validateUrl(urlString: string): URL {
+  let parsed: URL;
+  try {
+    parsed = new URL(urlString);
+  } catch {
+    throw new Error(`Invalid URL: ${urlString}`);
+  }
+
+  // Only allow http: and https: schemes
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`Blocked URL scheme: ${parsed.protocol}`);
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  // Block localhost and .local hostnames
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.local') ||
+    hostname === '[::1]'
+  ) {
+    throw new Error(`Blocked internal hostname: ${hostname}`);
+  }
+
+  // Check if hostname is a raw IPv4 address in a blocked range
+  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [, a, b, c, d] = ipv4Match.map(Number);
+    if (a > 255 || b > 255 || c > 255 || d > 255) {
+      throw new Error(`Invalid IP address: ${hostname}`);
+    }
+    const ipNum = ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
+    for (const range of BLOCKED_IPV4_RANGES) {
+      if ((ipNum & range.mask) === range.prefix) {
+        throw new Error(`Blocked internal IP address: ${hostname}`);
+      }
+    }
+  }
+
+  // Block IPv6 loopback and link-local (beyond [::1] caught above)
+  if (hostname.startsWith('[')) {
+    const inner = hostname.slice(1, -1).toLowerCase();
+    if (inner === '::1' || inner.startsWith('fe80') || inner.startsWith('fc') || inner.startsWith('fd')) {
+      throw new Error(`Blocked internal IPv6 address: ${hostname}`);
+    }
+  }
+
+  return parsed;
+}
 
 /**
  * Fetches a webpage and returns its text content stripped of HTML.
@@ -185,6 +257,7 @@ const MAX_REDIRECTS = 5;
  */
 export async function readWebpage(url: string): Promise<string> {
   try {
+    validateUrl(url);
     const html = await fetchUrl(url, MAX_REDIRECTS);
     const text = extractPageText(html);
 
@@ -234,6 +307,14 @@ function fetchUrl(url: string, maxRedirects: number): Promise<string> {
             return;
           }
           const redirectUrl = new URL(res.headers.location, url).href;
+          // Validate redirect target against SSRF blocklist
+          try {
+            validateUrl(redirectUrl);
+          } catch (err) {
+            reject(err instanceof Error ? err : new Error('Blocked redirect'));
+            res.resume();
+            return;
+          }
           fetchUrl(redirectUrl, maxRedirects - 1).then(resolve, reject);
           res.resume(); // Drain the response
           return;
@@ -246,7 +327,15 @@ function fetchUrl(url: string, maxRedirects: number): Promise<string> {
         }
 
         const chunks: Buffer[] = [];
-        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        let totalBytes = 0;
+        res.on('data', (chunk: Buffer) => {
+          totalBytes += chunk.length;
+          if (totalBytes > MAX_RESPONSE_BYTES) {
+            req.destroy(new Error(`Response body exceeds ${MAX_RESPONSE_BYTES} byte limit`));
+            return;
+          }
+          chunks.push(chunk);
+        });
         res.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
         res.on('error', reject);
       },

@@ -18,6 +18,7 @@ export function initStore() {
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  db.pragma('secure_delete = ON');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS conversations (
@@ -272,9 +273,15 @@ export function setSetting(key: string, value: string): void {
   db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(key, value);
 }
 
-/** Permanently deletes all messages, conversations, and SSO configurations. */
+/**
+ * Permanently deletes all messages, conversations, and SSO configurations.
+ * `secure_delete` is enabled globally at init, so freed pages are zeroed.
+ * A final `VACUUM` rebuilds the database file, eliminating any residual
+ * free-list pages that could retain deleted content (see SI-F06).
+ */
 export function wipeAllData(): void {
   db.exec('DELETE FROM messages');
   db.exec('DELETE FROM conversations');
   db.exec('DELETE FROM sso_configs');
+  db.exec('VACUUM');
 }

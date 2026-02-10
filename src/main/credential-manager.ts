@@ -16,6 +16,7 @@ import {
   performSsoLogin,
   performSsoDeviceAuth,
   getSsoRoleCredentials,
+  clearTokenCache,
   type SsoLoginProgress,
 } from './sso-auth';
 
@@ -194,6 +195,7 @@ export function disconnect(): void {
   currentRegion = null;
   currentSsoConfigId = null;
   currentSsoConfigName = null;
+  clearTokenCache();
 }
 
 /**

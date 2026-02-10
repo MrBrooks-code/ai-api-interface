@@ -75,8 +75,11 @@ function registerBuiltinTools() {
       },
     },
     execute: async (input) => {
+      if (typeof input.query !== 'string' || input.query.trim() === '') {
+        return { success: false, content: 'Invalid input: query must be a non-empty string' };
+      }
       const result = await searchWeb(
-        input.query as string,
+        input.query,
         input.count as number | undefined,
       );
       return { success: true, content: result };
@@ -101,7 +104,10 @@ function registerBuiltinTools() {
       },
     },
     execute: async (input) => {
-      const result = await readWebpage(input.url as string);
+      if (typeof input.url !== 'string' || input.url.trim() === '') {
+        return { success: false, content: 'Invalid input: url must be a non-empty string' };
+      }
+      const result = await readWebpage(input.url);
       return { success: true, content: result };
     },
   });

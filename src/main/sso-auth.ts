@@ -19,11 +19,21 @@ import {
   GetRoleCredentialsCommand,
 } from '@aws-sdk/client-sso';
 import { loadSharedConfigFiles } from '@smithy/shared-ini-file-loader';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import https from 'node:https';
 import { safeOpenExternal } from './safe-open';
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+
+/**
+ * Shared HTTPS agent enforcing TLS 1.2+ for all SSO/OIDC SDK clients
+ * (addresses SC-F03).
+ */
+const tlsHandler = new NodeHttpHandler({
+  httpsAgent: new https.Agent({ minVersion: 'TLSv1.2' }),
+});
 import type { SsoAccount, SsoRole } from '../shared/types';
 
 export interface SsoConfig {
@@ -125,7 +135,7 @@ export async function performSsoLogin(
   ssoConfig: SsoConfig,
   onProgress: (progress: SsoLoginProgress) => void
 ): Promise<void> {
-  const oidcClient = new SSOOIDCClient({ region: ssoConfig.ssoRegion });
+  const oidcClient = new SSOOIDCClient({ region: ssoConfig.ssoRegion, requestHandler: tlsHandler });
 
   // 1. Register client
   onProgress({ stage: 'registering' });
@@ -243,6 +253,18 @@ export interface DeviceAuthResult {
 const tokenCache = new Map<string, DeviceAuthResult>();
 
 /**
+ * Overwrites cached SSO access tokens with empty strings and clears the
+ * in-memory token cache. Called on disconnect to prevent stale tokens from
+ * lingering in the V8 heap (best-effort zeroization — see SI-F05).
+ */
+export function clearTokenCache(): void {
+  for (const entry of tokenCache.values()) {
+    entry.accessToken = '';
+  }
+  tokenCache.clear();
+}
+
+/**
  * Read a cached SSO token from ~/.aws/sso/cache/ and return structured data.
  */
 export function readCachedToken(startUrl: string): DeviceAuthResult | null {
@@ -289,7 +311,7 @@ export async function performSsoDeviceAuth(
   }
 
   // Full device auth flow (reuses same OIDC pattern as performSsoLogin)
-  const oidcClient = new SSOOIDCClient({ region });
+  const oidcClient = new SSOOIDCClient({ region, requestHandler: tlsHandler });
 
   onProgress({ stage: 'registering' });
   const registerResp = await oidcClient.send(
@@ -393,7 +415,7 @@ export async function listSsoAccounts(
   accessToken: string,
   ssoRegion: string
 ): Promise<SsoAccount[]> {
-  const client = new SSOClient({ region: ssoRegion });
+  const client = new SSOClient({ region: ssoRegion, requestHandler: tlsHandler });
   const accounts: SsoAccount[] = [];
   let nextToken: string | undefined;
 
@@ -422,7 +444,7 @@ export async function listSsoAccountRoles(
   ssoRegion: string,
   accountId: string
 ): Promise<SsoRole[]> {
-  const client = new SSOClient({ region: ssoRegion });
+  const client = new SSOClient({ region: ssoRegion, requestHandler: tlsHandler });
   const roles: SsoRole[] = [];
   let nextToken: string | undefined;
 
@@ -451,7 +473,7 @@ export async function getSsoRoleCredentials(
   accountId: string,
   roleName: string
 ): Promise<{ accessKeyId: string; secretAccessKey: string; sessionToken: string; expiration: number }> {
-  const client = new SSOClient({ region: ssoRegion });
+  const client = new SSOClient({ region: ssoRegion, requestHandler: tlsHandler });
   const resp = await client.send(
     new GetRoleCredentialsCommand({ accessToken, accountId, roleName })
   );

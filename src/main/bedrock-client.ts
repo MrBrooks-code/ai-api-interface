@@ -9,9 +9,20 @@ import {
   BedrockClient,
   ListInferenceProfilesCommand,
 } from '@aws-sdk/client-bedrock';
+import { NodeHttpHandler } from '@smithy/node-http-handler';
+import https from 'node:https';
 import { getCredentials, getRegion } from './credential-manager';
 import { getDefaultModelId } from '../shared/constants';
 import type { BedrockModel } from '../shared/types';
+
+/**
+ * Shared HTTPS agent that enforces TLS 1.2 as the minimum protocol version.
+ * Passed to all AWS SDK clients to guarantee strong transport encryption
+ * regardless of the Node.js/OS default (addresses SC-F03).
+ */
+const tlsHandler = new NodeHttpHandler({
+  httpsAgent: new https.Agent({ minVersion: 'TLSv1.2' }),
+});
 
 let runtimeClient: BedrockRuntimeClient | null = null;
 let controlClient: BedrockClient | null = null;
@@ -31,6 +42,7 @@ export function getBedrockClient(): BedrockRuntimeClient {
   runtimeClient = new BedrockRuntimeClient({
     region,
     credentials,
+    requestHandler: tlsHandler,
   });
 
   return runtimeClient;
@@ -50,6 +62,7 @@ function getControlClient(): BedrockClient {
   controlClient = new BedrockClient({
     region,
     credentials,
+    requestHandler: tlsHandler,
   });
 
   return controlClient;

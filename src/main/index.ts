@@ -5,7 +5,7 @@
  * built `dist/` directory in production.
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
 import { initStore } from './store';
@@ -32,6 +32,11 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
     },
+  });
+
+  // Deny all renderer permission requests (camera, mic, geolocation, etc.)
+  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
   });
 
   // Open external links in default browser instead of navigating Electron

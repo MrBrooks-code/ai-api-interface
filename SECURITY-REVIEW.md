@@ -15,16 +15,16 @@ Bedrock Chat is an Electron-based desktop application that provides a chat inter
 
 Since the original review on 2026-02-09, all **critical** and **high** severity findings have been remediated. Additionally, three **medium** severity findings (source maps, `.gitignore`, and plaintext credential IPC) have been closed — the manual AWS key entry flow was removed entirely in favor of SSO-only authentication.
 
-A comprehensive re-review on 2026-02-10 identified **4 new findings** (1 medium, 3 low) and confirmed closure of 4 previously open items.
+A comprehensive re-review on 2026-02-10 identified **4 new findings** (1 medium, 3 low) and confirmed closure of 4 previously open items. A further security review of the `web_search` and `read_webpage` tool additions on 2026-02-10 identified **4 additional findings** (1 critical, 1 high, 2 medium) related to SSRF and resource exhaustion — all remediated same-day.
 
 ### Risk Summary
 
 | Severity | Count | Status |
 |----------|-------|--------|
-| Critical | 3 | **ALL REMEDIATED** (2026-02-09) |
-| High | 5 | **ALL REMEDIATED** (2026-02-09 / 2026-02-10) |
-| Medium | 5 | **5 REMEDIATED** (2026-02-10) — 2 remaining: AU-F01, CM-F02 |
-| Low | 5 | SC-F03, SC-F05, SI-F05, SI-F06, AC-F04 |
+| Critical | 4 | **ALL REMEDIATED** (2026-02-09 / 2026-02-10) |
+| High | 6 | **ALL REMEDIATED** (2026-02-09 / 2026-02-10) |
+| Medium | 6 | **6 REMEDIATED** (2026-02-10) — 2 remaining: AU-F01, CM-F02 |
+| Low | 1 | SI-F08 (accepted risk) |
 
 ---
 
@@ -117,21 +117,16 @@ webPreferences: {
 
 ---
 
-#### AC-F04: No Electron Permission Request Handler — LOW (New)
+#### AC-F04: No Electron Permission Request Handler — ~~LOW~~ REMEDIATED ✅
 
-**Location:** `src/main/index.ts`
-
-**Impact:** No `session.defaultSession.setPermissionRequestHandler()` is configured. Electron's default behavior is to grant permission requests (camera, microphone, geolocation, notifications, etc.) from the renderer. While this application does not request any such permissions, a compromised renderer or injected script could request permissions that would be silently granted.
+**Location:** `src/main/index.ts:37-39`
+**Remediated:** 2026-02-10
 
 **CMMC Control:** AC.L2-3.1.1 — Limit system access to authorized users, processes acting on behalf of authorized users, and devices.
 
-**Recommendation:** Add a blanket permission deny handler in `createWindow()`:
-```typescript
-const { session } = mainWindow.webContents;
-session.setPermissionRequestHandler((_webContents, _permission, callback) => {
-  callback(false); // Deny all permission requests
-});
-```
+**Fix applied:** Added a blanket deny-all `setPermissionRequestHandler` on `session.defaultSession` inside `createWindow()`. All Chromium permission requests (camera, microphone, geolocation, notifications, etc.) are now rejected. The application does not use any of these APIs, so there is no functional impact.
+
+**Files modified:** `src/main/index.ts`
 
 ---
 
@@ -276,32 +271,22 @@ This blocks external scripts, external connections, object/embed tags, and restr
 
 ---
 
-#### SC-F03: No Explicit TLS Configuration — LOW
+#### SC-F03: No Explicit TLS Configuration — ~~LOW~~ REMEDIATED ✅
 
-**Location:** `src/main/bedrock-client.ts:31-34`
-
-```typescript
-runtimeClient = new BedrockRuntimeClient({
-  region,
-  credentials,
-});
-```
-
-**Impact:** The application relies on AWS SDK v3 defaults for TLS configuration. While the SDK defaults to TLS 1.2+, there is no explicit enforcement of minimum TLS version, no certificate pinning, and no custom CA bundle configuration for environments behind TLS-inspecting proxies.
+**Location:** `src/main/bedrock-client.ts:17-20`, `src/main/sso-auth.ts:27-30`
+**Remediated:** 2026-02-10
 
 **CMMC Control:** SC.L2-3.13.8 — Implement cryptographic mechanisms to prevent unauthorized disclosure of CUI during transmission.
 
-**Mitigating Factor:** AWS SDK v3 enforces TLS 1.2+ by default. AWS service endpoints only accept TLS 1.2+. The risk here is theoretical.
+**Fix applied:** Created a shared `NodeHttpHandler` with an `https.Agent` that enforces `minVersion: 'TLSv1.2'` and passed it via `requestHandler` to all five AWS SDK client instantiations:
+- `BedrockRuntimeClient` — `src/main/bedrock-client.ts:42`
+- `BedrockClient` — `src/main/bedrock-client.ts:61`
+- `SSOOIDCClient` (×2) — `src/main/sso-auth.ts:138,302`
+- `SSOClient` (×3) — `src/main/sso-auth.ts:406,435,464`
 
-**Recommendation:** For GovCloud deployments, explicitly configure a custom HTTPS agent that enforces TLS 1.2+:
-```typescript
-import { NodeHttpHandler } from '@smithy/node-http-handler';
-import https from 'https';
+This guarantees TLS 1.2 as the floor regardless of the Node.js or OS default, providing defense-in-depth on top of the AWS SDK's own TLS 1.2 default.
 
-const handler = new NodeHttpHandler({
-  httpsAgent: new https.Agent({ minVersion: 'TLSv1.2' }),
-});
-```
+**Files modified:** `src/main/bedrock-client.ts`, `src/main/sso-auth.ts`
 
 ---
 
@@ -316,20 +301,52 @@ const handler = new NodeHttpHandler({
 
 ---
 
-#### SC-F05: CSP Missing `blob:` in `img-src` Directive — LOW (New)
+#### SC-F05: CSP Missing `blob:` in `img-src` Directive — ~~LOW~~ REMEDIATED ✅
 
 **Location:** `src/renderer/index.html:10`
+**Remediated:** 2026-02-10
 
-```
-img-src 'self' data:;
-```
+**CMMC Control:** SC.L2-3.13.1 — Monitor, control, and protect communications at the external boundaries and key internal boundaries of organizational systems.
 
-**Impact:** The `FilePreview.tsx` component creates blob URLs via `URL.createObjectURL()` for rendering image thumbnails and inline image blocks. The current CSP `img-src` directive does not include `blob:`, which means Chromium may block these images in production builds. This is primarily a functional issue but also represents a CSP misconfiguration.
+**Fix applied:** Added `blob:` to the CSP `img-src` directive so `FilePreview.tsx` blob URLs created via `URL.createObjectURL()` are permitted. The directive is now `img-src 'self' data: blob:`.
 
-**Recommendation:** Update the CSP `img-src` directive to include `blob:`:
-```
-img-src 'self' data: blob:;
-```
+**Files modified:** `src/renderer/index.html`
+
+---
+
+#### SC-F06: SSRF — No URL Validation in `readWebpage()` — ~~CRITICAL~~ REMEDIATED ✅
+
+**Location:** `src/main/web-search.ts:200-248,258-260`
+**Remediated:** 2026-02-10
+
+**CMMC Control:** SC.L2-3.13.1 — Monitor, control, and protect communications at the external boundaries and key internal boundaries of organizational systems.
+
+**Impact:** The `readWebpage()` function accepted arbitrary URLs with no validation, allowing a model-driven tool call to fetch internal resources: AWS instance metadata (`http://169.254.169.254/`), loopback services (`http://localhost:8080/`), private network hosts (`http://10.x.x.x/`), or non-HTTP schemes (`file:///etc/passwd`). This is a classic Server-Side Request Forgery (SSRF) vulnerability.
+
+**Fix applied:** Added `validateUrl()` function that blocks:
+- **Private/internal IPv4 ranges:** `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `127.0.0.0/8`, `169.254.0.0/16` (AWS metadata), `0.0.0.0/32`
+- **Non-HTTP(S) schemes:** Only `http:` and `https:` are allowed; `file:`, `ftp:`, `data:`, etc. are blocked
+- **Localhost hostnames:** `localhost`, `*.local`, `[::1]`
+- **IPv6 private ranges:** `fe80::` (link-local), `fc00::`/`fd00::` (unique local)
+
+Validation is applied at the top of `readWebpage()` before any network call is made.
+
+**Files modified:** `src/main/web-search.ts`
+
+---
+
+#### SC-F07: Redirect Targets Not Validated Against SSRF Blocklist — ~~HIGH~~ REMEDIATED ✅
+
+**Location:** `src/main/web-search.ts:309-317`
+**Remediated:** 2026-02-10
+
+**CMMC Control:** SC.L2-3.13.1 — Monitor, control, and protect communications at the external boundaries and key internal boundaries of organizational systems.
+
+**Impact:** Even with URL validation at the entry point, `fetchUrl()` followed HTTP redirects (3xx responses) without re-validating the redirect target URL. An attacker could host a page at a public URL that 302-redirects to an internal address, bypassing the initial SSRF check.
+
+**Fix applied:** Added `validateUrl()` check on the resolved redirect URL inside `fetchUrl()` before following the redirect. Additionally, reduced `MAX_REDIRECTS` from 5 to 3 to shrink the redirect-chain attack surface.
+
+**Files modified:** `src/main/web-search.ts`
 
 ---
 
@@ -386,37 +403,69 @@ Exceeded requests return a structured error result matching each handler's exist
 
 ---
 
-#### SI-F05: SSO Tokens in Memory Not Zeroized on Disconnect — LOW (New)
+#### SI-F05: SSO Tokens in Memory Not Zeroized on Disconnect — ~~LOW~~ REMEDIATED ✅
 
-**Locations:**
-- `src/main/sso-auth.ts:243` — `tokenCache` Map
-- `src/main/ipc-handlers.ts:54` — `pendingWizardToken`
-
-**Impact:** The `tokenCache` Map in `sso-auth.ts` holds raw SSO access tokens keyed by start URL, and `pendingWizardToken` in `ipc-handlers.ts` holds the device auth result including the access token. Neither of these are cleared when `disconnect()` is called. SSO access tokens (typically valid for 8 hours) remain in memory after the user disconnects or the session times out.
+**Locations:** `src/main/sso-auth.ts:253-263`, `src/main/ipc-handlers.ts:57-62`
+**Remediated:** 2026-02-10
 
 **CMMC Control:** SI.L2-3.14.3 — Monitor system security alerts and advisories and take action in response.
 
-**Recommendation:** Clear `pendingWizardToken` in the `SSO_DELETE_CONFIG` handler when disconnecting, and export a `clearTokenCache()` function from `sso-auth.ts` that is called by `disconnect()`.
+**Fix applied:**
+1. Added `clearTokenCache()` in `sso-auth.ts` — iterates `tokenCache`, overwrites each `accessToken` with `''`, then clears the Map. Called from `credential-manager.ts:disconnect()`.
+2. Added `clearPendingWizardToken()` in `ipc-handlers.ts` — overwrites `pendingWizardToken.accessToken` with `''`, then nulls the reference. Called from: `SSO_DELETE_CONFIG` handler on active-config deletion, and both `startSessionTimer` expiry callbacks.
+
+Both functions follow the same best-effort zeroization pattern used for AWS credentials (SI-F02).
+
+**Files modified:** `src/main/sso-auth.ts`, `src/main/credential-manager.ts`, `src/main/ipc-handlers.ts`
 
 ---
 
-#### SI-F06: Non-Secure Database Deletion in `wipeAllData` — LOW (New)
+#### SI-F06: Non-Secure Database Deletion in `wipeAllData` — ~~LOW~~ REMEDIATED ✅
 
-**Location:** `src/main/store.ts:276-280`
-
-```typescript
-export function wipeAllData(): void {
-  db.exec('DELETE FROM messages');
-  db.exec('DELETE FROM conversations');
-  db.exec('DELETE FROM sso_configs');
-}
-```
-
-**Impact:** SQLite `DELETE FROM` marks pages as free but does not zero the underlying disk pages. Deleted conversation content, including messages that may contain CUI, remains physically on disk until the pages are reused by future writes. A forensic examination of the database file (or the underlying disk sectors) could recover deleted data.
+**Location:** `src/main/store.ts:21`, `src/main/store.ts:281-286`
+**Remediated:** 2026-02-10
 
 **CMMC Control:** MP.L2-3.8.3 — Sanitize or destroy information system media containing CUI before disposal or release for reuse.
 
-**Recommendation:** After deletion, run `PRAGMA secure_delete = ON` before the deletes, or follow up with `VACUUM` to rebuild the database file. For strongest guarantees, consider `PRAGMA secure_delete = ON` as a global database pragma set at init time.
+**Fix applied:**
+1. Added `PRAGMA secure_delete = ON` at database init time (`src/main/store.ts:21`) — SQLite now zeros the content of freed pages on every `DELETE` operation, not just wipes.
+2. Added `VACUUM` at the end of `wipeAllData()` (`src/main/store.ts:286`) — rebuilds the entire database file, eliminating any residual free-list pages.
+
+Together these ensure deleted conversation content (which may contain CUI) is not recoverable from the database file after deletion.
+
+**Files modified:** `src/main/store.ts`
+
+---
+
+#### SI-F07: No Response Body Size Limit in `fetchUrl()` — ~~MEDIUM~~ REMEDIATED ✅
+
+**Location:** `src/main/web-search.ts:329-337`
+**Remediated:** 2026-02-10
+
+**CMMC Control:** SI.L2-3.14.1 — Identify, report, and correct system flaws in a timely manner.
+
+**Impact:** The `fetchUrl()` function collected response data without any size limit. A malicious or misconfigured server could stream an arbitrarily large response, consuming all available memory and crashing the Electron main process (denial of service).
+
+**Fix applied:** Added a `MAX_RESPONSE_BYTES` constant (5 MB) and a cumulative byte counter in the `res.on('data')` handler. When the limit is exceeded, the request is destroyed with an error message. The 5 MB limit is generous for HTML pages while protecting against unbounded memory consumption.
+
+**Files modified:** `src/main/web-search.ts`
+
+---
+
+#### SI-F08: Search Queries Sent to Third-Party Service (DuckDuckGo) — LOW (Accepted Risk)
+
+**Location:** `src/main/web-search.ts:44-76`
+
+**CMMC Control:** SI.L2-3.14.6 — Monitor organizational systems, including inbound and outbound communications traffic, to detect attacks and indicators of potential attacks.
+
+**Impact:** The `web_search` tool sends user-entered search queries (which may contain CUI context) to DuckDuckGo's public HTML endpoint over HTTPS. While the query content is encrypted in transit, it is processed by a third-party service outside the organization's control boundary.
+
+**Mitigating Factors:**
+- Search queries are triggered by the LLM model as tool calls, not directly by user input — the model generates queries based on conversation context
+- DuckDuckGo does not log search queries or build user profiles (per their privacy policy)
+- The connection uses HTTPS, protecting query confidentiality in transit
+
+**Recommendation:** Document this data flow in the application's System Security Plan (SSP). Organizations handling CUI should evaluate whether model-generated search queries could contain sensitive information and consider disabling the `web_search` tool via admin configuration if the risk is unacceptable.
 
 ---
 
@@ -432,15 +481,18 @@ The following security controls are correctly implemented:
 | SQL injection prevention | All queries use parameterized statements (`?` placeholders) | `src/main/store.ts` (all queries) |
 | Foreign key constraints | `PRAGMA foreign_keys = ON` with cascade deletes | `src/main/store.ts:20` |
 | WAL mode | `PRAGMA journal_mode = WAL` for database integrity | `src/main/store.ts:19` |
+| Secure delete | `PRAGMA secure_delete = ON` zeros freed pages; `VACUUM` after wipe | `src/main/store.ts:21,286` |
 | Credential isolation | AWS credentials stored only in main process, never sent to renderer | `src/main/credential-manager.ts` |
 | Credential zeroization | `disconnect()` overwrites credential strings before clearing references | `src/main/credential-manager.ts:182-196` |
 | Session timeout | Configurable auto-disconnect with credential zeroization | `src/main/credential-manager.ts:204-219` |
 | SSO-only authentication | No manual AWS access key input; SSO or CLI profile only | IPC channels (no `AWS_CONNECT_KEYS`) |
-| SSO token isolation | `pendingWizardToken` held in main process module scope only | `src/main/ipc-handlers.ts:54` |
+| SSO token isolation | `pendingWizardToken` held in main process module scope only | `src/main/ipc-handlers.ts:55` |
+| SSO token zeroization | `clearTokenCache()` and `clearPendingWizardToken()` overwrite tokens on disconnect | `src/main/sso-auth.ts:253-263`, `src/main/ipc-handlers.ts:57-62` |
 | SSO token file permissions | Cache files `0o600`, directories `0o700` | `src/main/sso-auth.ts:193,206` |
-| Navigation lockdown | External URLs opened in default browser, in-app navigation blocked | `src/main/index.ts:37-49` |
+| Permission deny-all | `setPermissionRequestHandler` rejects all Chromium permission requests | `src/main/index.ts:37-39` |
+| Navigation lockdown | External URLs opened in default browser, in-app navigation blocked | `src/main/index.ts:42-55` |
 | Window open handler | New windows denied, URLs redirected to external browser | `src/main/index.ts:37-40` |
-| Content Security Policy | Strict CSP meta tag: `script-src 'self'`, `object-src 'none'` | `src/renderer/index.html:6-14` |
+| Content Security Policy | Strict CSP meta tag: `script-src 'self'`, `img-src 'self' data: blob:`, `object-src 'none'` | `src/renderer/index.html:6-14` |
 | File access restriction | `readFile()` restricted to dialog-selected paths via `allowedPaths` set | `src/main/file-handler.ts:13,73` |
 | File size limit | 50 MB maximum enforced before reading | `src/main/file-handler.ts:65,81` |
 | Safe expression evaluation | `expr-eval` sandboxed parser, no `eval()`/`Function()` | `src/main/tool-executor.ts:8,12` |
@@ -449,8 +501,14 @@ The following security controls are correctly implemented:
 | Source maps disabled in prod | `sourcemap: !isProduction` in Vite config | `vite.config.ts:18,35,58` |
 | TypeScript strict mode | `"strict": true` enforces type safety throughout | `tsconfig.json:8` |
 | ASAR packaging | Application code bundled in ASAR archive | `electron-builder.yml:11` |
+| SSRF protection | `validateUrl()` blocks private IPs, non-HTTP(S) schemes, localhost | `src/main/web-search.ts:200-248` |
+| Redirect validation | Redirect targets re-validated against SSRF blocklist | `src/main/web-search.ts:310-317` |
+| Response size limit | 5 MB max response body prevents memory exhaustion | `src/main/web-search.ts:178,329-337` |
+| Tool input validation | `web_search` and `read_webpage` validate input types before execution | `src/main/tool-executor.ts:78-80,107-109` |
+| Redirect limit | Maximum 3 redirects to limit redirect-chain attacks | `src/main/web-search.ts:176` |
 | Document name sanitization | Special characters stripped before Bedrock API calls | `src/main/bedrock-stream.ts:30-37` |
 | Stream abort support | Active streams can be cancelled via `AbortController` | `src/main/bedrock-stream.ts:23,125` |
+| TLS 1.2+ enforcement | All AWS SDK clients use `NodeHttpHandler` with `minVersion: 'TLSv1.2'` | `src/main/bedrock-client.ts:17-20`, `src/main/sso-auth.ts:27-30` |
 | Token expiry validation | SSO tokens checked against expiration before use | `src/main/sso-auth.ts:107,254,278` |
 | Secret file exclusion | `.gitignore` covers `.env`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `credentials.json` | `.gitignore:9-16` |
 
@@ -492,26 +550,30 @@ The following security controls are correctly implemented:
 | 9 | CM-F01 | Medium | ✅ **REMEDIATED** — Source maps disabled in production via Vite config |
 | 10 | CM-F03 | Medium | ✅ **REMEDIATED** — `.gitignore` updated with secret file patterns |
 | 11 | IA-F01 | Medium | ✅ **REMEDIATED** — Manual key entry removed; SSO-only authentication |
+| 12 | SC-F06 | Critical | ✅ **REMEDIATED** — `validateUrl()` blocks private IPs, non-HTTP(S) schemes, localhost |
+| 13 | SC-F07 | High | ✅ **REMEDIATED** — Redirect targets validated against SSRF blocklist |
+| 14 | SI-F07 | Medium | ✅ **REMEDIATED** — 5 MB response body size limit in `fetchUrl()` |
 
 ### Short-Term (Next Sprint)
 
 | # | Finding | Severity | Effort | Action |
 |---|---------|----------|--------|--------|
-| 12 | SC-F04 | Medium | 1 hour | ✅ **REMEDIATED** — `safeOpenExternal()` validates URL schemes (HTTP/S only) |
-| 13 | AU-F01 | Medium | 4-6 hours | ⬜ Implement structured audit logging |
-| 14 | SI-F04 | Medium | 2-3 hours | ✅ **REMEDIATED** — Sliding-window rate limiter on 6 IPC handlers |
+| 15 | SC-F04 | Medium | 1 hour | ✅ **REMEDIATED** — `safeOpenExternal()` validates URL schemes (HTTP/S only) |
+| 16 | AU-F01 | Medium | 4-6 hours | ⬜ Implement structured audit logging |
+| 17 | SI-F04 | Medium | 2-3 hours | ✅ **REMEDIATED** — Sliding-window rate limiter on 6 IPC handlers |
 
 ### Medium-Term (Before Production)
 
 | # | Finding | Severity | Effort | Action |
 |---|---------|----------|--------|--------|
-| 15 | CM-F02 | Medium | 2-4 hours | ⬜ Configure code signing for macOS and Windows |
-| 16 | MP-F01 | Medium | 4-8 hours | ⬜ Evaluate SQLCipher for database encryption (if CUI stored) |
-| 17 | SI-F06 | Low | 30 min | ⬜ Add `PRAGMA secure_delete = ON` or `VACUUM` after data wipe |
-| 18 | SI-F05 | Low | 30 min | ⬜ Clear SSO token caches on disconnect |
-| 19 | SC-F05 | Low | 15 min | ⬜ Add `blob:` to CSP `img-src` directive |
-| 20 | AC-F04 | Low | 15 min | ⬜ Add permission request deny-all handler |
-| 21 | SC-F03 | Low | 30 min | ⬜ Explicit TLS 1.2+ enforcement on SDK clients |
+| 18 | CM-F02 | Medium | 2-4 hours | ⬜ Configure code signing for macOS and Windows |
+| 19 | MP-F01 | Medium | 4-8 hours | ⬜ Evaluate SQLCipher for database encryption (if CUI stored) |
+| 20 | SI-F06 | Low | 30 min | ✅ **REMEDIATED** — `PRAGMA secure_delete = ON` at init + `VACUUM` after wipe |
+| 21 | SI-F05 | Low | 30 min | ✅ **REMEDIATED** — `clearTokenCache()` + `clearPendingWizardToken()` on disconnect |
+| 22 | SC-F05 | Low | 15 min | ✅ **REMEDIATED** — Added `blob:` to CSP `img-src` directive |
+| 23 | AC-F04 | Low | 15 min | ✅ **REMEDIATED** — Deny-all `setPermissionRequestHandler` on default session |
+| 24 | SC-F03 | Low | 30 min | ✅ **REMEDIATED** — `NodeHttpHandler` with `minVersion: 'TLSv1.2'` on all SDK clients |
+| 25 | SI-F08 | Low | — | Accepted Risk — Document third-party data flow in SSP |
 
 ---
 
@@ -519,13 +581,13 @@ The following security controls are correctly implemented:
 
 | CMMC Domain | Controls Assessed | Findings | Status |
 |-------------|-------------------|----------|--------|
-| AC — Access Control | AC.L2-3.1.1, 3.1.2, 3.1.3, 3.1.10, 3.1.11 | 4 findings (3 remediated) | **Substantially complete** — AC-F04 (low) open |
+| AC — Access Control | AC.L2-3.1.1, 3.1.2, 3.1.3, 3.1.10, 3.1.11 | 4 findings (4 remediated) | **Complete** — all findings closed |
 | AU — Audit & Accountability | AU.L2-3.3.1, 3.3.2 | 1 finding | Not Implemented |
 | CM — Configuration Management | CM.L2-3.4.1, 3.4.2, 3.4.6 | 3 findings (2 remediated) | Partial — CM-F02 (code signing) open |
 | IA — Identification & Auth | IA.L2-3.5.10 | 1 finding (1 remediated) | **Complete** — Manual keys removed |
 | MP — Media Protection | MP.L2-3.8.3, 3.8.9 | 2 findings | Partial — depends on FDE + secure delete |
-| SC — System & Comms Protection | SC.L2-3.13.1, 3.13.8, 3.13.16 | 5 findings (3 remediated) | Partial — SC-F03 + SC-F05 (low) open |
-| SI — System & Info Integrity | SI.L2-3.14.1, 3.14.2, 3.14.3, 3.14.6 | 6 findings (4 remediated) | Partial — SI-F05 + SI-F06 (low) open |
+| SC — System & Comms Protection | SC.L2-3.13.1, 3.13.8, 3.13.16 | 7 findings (7 remediated) | **Complete** — all findings closed |
+| SI — System & Info Integrity | SI.L2-3.14.1, 3.14.2, 3.14.3, 3.14.6 | 8 findings (7 remediated) | **Substantially complete** — SI-F08 (accepted risk) only |
 
 ---
 
@@ -568,3 +630,13 @@ The following security controls are correctly implemented:
 | 2026-02-10 | SI-F05 | — | NEW finding: SSO token caches (`tokenCache`, `pendingWizardToken`) not cleared on disconnect. | — |
 | 2026-02-10 | SI-F06 | — | NEW finding: `wipeAllData()` uses `DELETE FROM` without secure deletion. | — |
 | 2026-02-10 | AC-F04 | — | NEW finding: No `setPermissionRequestHandler` configured on Electron session. | — |
+| 2026-02-10 | SC-F06 | Critical → Remediated | Added `validateUrl()` function blocking private IPs (10/172.16/192.168/127/169.254), non-HTTP(S) schemes, localhost hostnames, and IPv6 private ranges. Applied at `readWebpage()` entry point. | `src/main/web-search.ts` |
+| 2026-02-10 | SC-F07 | High → Remediated | Added `validateUrl()` check on redirect targets inside `fetchUrl()` before following redirects. Reduced `MAX_REDIRECTS` from 5 to 3. | `src/main/web-search.ts` |
+| 2026-02-10 | SI-F07 | Medium → Remediated | Added 5 MB (`MAX_RESPONSE_BYTES`) cumulative size limit in `fetchUrl()` data handler. Request destroyed if limit exceeded. | `src/main/web-search.ts` |
+| 2026-02-10 | SI-F08 | — | NEW finding (Accepted Risk): Search queries sent to DuckDuckGo third-party service. Documented for SSP. | — |
+| 2026-02-10 | — | — | Added runtime input validation for `web_search` (query) and `read_webpage` (url) tool executors. Non-string or empty inputs now return error results. | `src/main/tool-executor.ts` |
+| 2026-02-10 | SC-F03 | Low → Remediated | Added `NodeHttpHandler` with `https.Agent({ minVersion: 'TLSv1.2' })` to all AWS SDK clients (BedrockRuntimeClient, BedrockClient, SSOOIDCClient ×2, SSOClient ×3). | `src/main/bedrock-client.ts`, `src/main/sso-auth.ts` |
+| 2026-02-10 | SI-F05 | Low → Remediated | Added `clearTokenCache()` in `sso-auth.ts` (overwrites + clears `tokenCache` Map) called from `disconnect()`. Added `clearPendingWizardToken()` in `ipc-handlers.ts` (overwrites + nulls `pendingWizardToken`) called on disconnect and session expiry. | `src/main/sso-auth.ts`, `src/main/credential-manager.ts`, `src/main/ipc-handlers.ts` |
+| 2026-02-10 | SI-F06 | Low → Remediated | Added `PRAGMA secure_delete = ON` at database init (zeros freed pages on every DELETE). Added `VACUUM` at end of `wipeAllData()` to rebuild the database file and eliminate free-list residue. | `src/main/store.ts` |
+| 2026-02-10 | AC-F04 | Low → Remediated | Added `session.defaultSession.setPermissionRequestHandler()` that denies all Chromium permission requests (camera, mic, geolocation, notifications, etc.) in `createWindow()`. | `src/main/index.ts` |
+| 2026-02-10 | SC-F05 | Low → Remediated | Added `blob:` to CSP `img-src` directive for `FilePreview.tsx` blob URL support. | `src/renderer/index.html` |

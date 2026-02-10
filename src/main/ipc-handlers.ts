@@ -54,6 +54,14 @@ import type { SsoConfiguration } from '../shared/types';
 // Module-level token held securely in main process — never sent to renderer
 let pendingWizardToken: DeviceAuthResult | null = null;
 
+/** Overwrites and releases the pending wizard token (best-effort zeroization). */
+function clearPendingWizardToken(): void {
+  if (pendingWizardToken) {
+    pendingWizardToken.accessToken = '';
+    pendingWizardToken = null;
+  }
+}
+
 /** Registers all IPC channel handlers. Called once during app initialization. */
 export function registerIpcHandlers() {
   // --- AWS Credentials ---
@@ -77,6 +85,7 @@ export function registerIpcHandlers() {
 
       const { sessionDurationMinutes } = getAdminConfig();
       startSessionTimer(sessionDurationMinutes, () => {
+        clearPendingWizardToken();
         getMainWindow()?.webContents.send(IPC.AWS_SESSION_EXPIRED);
       });
 
@@ -129,6 +138,7 @@ export function registerIpcHandlers() {
     const wasActive = getSsoConfigId() === id;
     deleteSsoConfig(id);
     if (wasActive) {
+      clearPendingWizardToken();
       disconnect();
     }
     return { success: true, wasActive };
@@ -203,6 +213,7 @@ export function registerIpcHandlers() {
 
       const { sessionDurationMinutes } = getAdminConfig();
       startSessionTimer(sessionDurationMinutes, () => {
+        clearPendingWizardToken();
         getMainWindow()?.webContents.send(IPC.AWS_SESSION_EXPIRED);
       });
 
