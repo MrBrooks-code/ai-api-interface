@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Theme palettes ===== */
+
+/* Catppuccin Mocha (default dark) */
+:root,
+.theme-catppuccin-mocha {
+  --color-surface: #1e1e2e;
+  --color-surface-light: #313244;
+  --color-surface-lighter: #45475a;
+  --color-primary: #89b4fa;
+  --color-primary-hover: #74c7ec;
+  --color-text: #cdd6f4;
+  --color-text-muted: #a6adc8;
+  --color-text-dim: #6c7086;
+  --color-accent-green: #a6e3a1;
+  --color-accent-red: #f38ba8;
+  --color-accent-yellow: #f9e2af;
+  --color-accent-peach: #fab387;
+  --color-scrollbar-thumb: #45475a;
+  --color-scrollbar-thumb-hover: #585b70;
+}
+
+/* Catppuccin Latte (light) */
+.theme-catppuccin-latte {
+  --color-surface: #eff1f5;
+  --color-surface-light: #e6e9ef;
+  --color-surface-lighter: #ccd0da;
+  --color-primary: #1e66f5;
+  --color-primary-hover: #2a6ef6;
+  --color-text: #4c4f69;
+  --color-text-muted: #6c6f85;
+  --color-text-dim: #9ca0b0;
+  --color-accent-green: #40a02b;
+  --color-accent-red: #d20f39;
+  --color-accent-yellow: #df8e1d;
+  --color-accent-peach: #fe640b;
+  --color-scrollbar-thumb: #ccd0da;
+  --color-scrollbar-thumb-hover: #bcc0cc;
+}
+
+/* Nord */
+.theme-nord {
+  --color-surface: #2e3440;
+  --color-surface-light: #3b4252;
+  --color-surface-lighter: #434c5e;
+  --color-primary: #88c0d0;
+  --color-primary-hover: #8fbcbb;
+  --color-text: #eceff4;
+  --color-text-muted: #d8dee9;
+  --color-text-dim: #4c566a;
+  --color-accent-green: #a3be8c;
+  --color-accent-red: #bf616a;
+  --color-accent-yellow: #ebcb8b;
+  --color-accent-peach: #d08770;
+  --color-scrollbar-thumb: #434c5e;
+  --color-scrollbar-thumb-hover: #4c566a;
+}
+
+/* Tokyo Night */
+.theme-tokyo-night {
+  --color-surface: #1a1b26;
+  --color-surface-light: #24283b;
+  --color-surface-lighter: #414868;
+  --color-primary: #7aa2f7;
+  --color-primary-hover: #7dcfff;
+  --color-text: #c0caf5;
+  --color-text-muted: #a9b1d6;
+  --color-text-dim: #565f89;
+  --color-accent-green: #9ece6a;
+  --color-accent-red: #f7768e;
+  --color-accent-yellow: #e0af68;
+  --color-accent-peach: #ff9e64;
+  --color-scrollbar-thumb: #414868;
+  --color-scrollbar-thumb-hover: #565f89;
+}
+
+/* Rose Pine */
+.theme-rose-pine {
+  --color-surface: #191724;
+  --color-surface-light: #1f1d2e;
+  --color-surface-lighter: #26233a;
+  --color-primary: #c4a7e7;
+  --color-primary-hover: #ebbcba;
+  --color-text: #e0def4;
+  --color-text-muted: #908caa;
+  --color-text-dim: #6e6a86;
+  --color-accent-green: #9ccfd8;
+  --color-accent-red: #eb6f92;
+  --color-accent-yellow: #f6c177;
+  --color-accent-peach: #ebbcba;
+  --color-scrollbar-thumb: #26233a;
+  --color-scrollbar-thumb-hover: #393552;
+}
+
+/* Gruvbox Dark */
+.theme-gruvbox-dark {
+  --color-surface: #282828;
+  --color-surface-light: #3c3836;
+  --color-surface-lighter: #504945;
+  --color-primary: #83a598;
+  --color-primary-hover: #8ec07c;
+  --color-text: #ebdbb2;
+  --color-text-muted: #bdae93;
+  --color-text-dim: #665c54;
+  --color-accent-green: #b8bb26;
+  --color-accent-red: #fb4934;
+  --color-accent-yellow: #fabd2f;
+  --color-accent-peach: #fe8019;
+  --color-scrollbar-thumb: #504945;
+  --color-scrollbar-thumb-hover: #665c54;
+}
+
+/* Solarized Light */
+.theme-solarized-light {
+  --color-surface: #fdf6e3;
+  --color-surface-light: #eee8d5;
+  --color-surface-lighter: #ddd6c1;
+  --color-primary: #268bd2;
+  --color-primary-hover: #2aa198;
+  --color-text: #657b83;
+  --color-text-muted: #839496;
+  --color-text-dim: #93a1a1;
+  --color-accent-green: #859900;
+  --color-accent-red: #dc322f;
+  --color-accent-yellow: #b58900;
+  --color-accent-peach: #cb4b16;
+  --color-scrollbar-thumb: #ddd6c1;
+  --color-scrollbar-thumb-hover: #c9c2ac;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
+}
+
+/* Code block styling */
+pre code.hljs {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Markdown content styling */
+.markdown-content h1 { @apply text-2xl font-bold mb-3 mt-4; }
+.markdown-content h2 { @apply text-xl font-bold mb-2 mt-3; }
+.markdown-content h3 { @apply text-lg font-semibold mb-2 mt-3; }
+.markdown-content p { @apply mb-2 leading-relaxed; }
+.markdown-content ul { @apply list-disc pl-6 mb-2; }
+.markdown-content ol { @apply list-decimal pl-6 mb-2; }
+.markdown-content li { @apply mb-1; }
+.markdown-content blockquote { @apply border-l-4 border-surface-lighter pl-4 italic my-2; }
+.markdown-content a { @apply text-primary hover:text-primary-hover underline; }
+.markdown-content table { @apply border-collapse my-2 w-full; }
+.markdown-content th { @apply border border-surface-lighter px-3 py-1 bg-surface-light font-semibold; }
+.markdown-content td { @apply border border-surface-lighter px-3 py-1; }
+.markdown-content code:not(pre code) { @apply bg-surface-light px-1.5 py-0.5 rounded text-sm font-mono; }
+.markdown-content hr { @apply border-surface-lighter my-4; }
+
+
+/* Titlebar drag strip — only applied to the dedicated top bar element */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+
+/* Smooth transitions */
+.transition-sidebar {
+  transition: width 0.2s ease-in-out;
+}

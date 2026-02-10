@@ -1,0 +1,51 @@
+{
+  "name": "bedrock-chat",
+  "version": "1.0.0",
+  "description": "Cross-platform desktop chat application for Amazon Bedrock",
+  "main": "dist-electron/main/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "electron-builder install-app-deps",
+    "package:mac": "npm run build && electron-builder --mac",
+    "package:win": "npm run build && electron-builder --win"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.986.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.700.0",
+    "@aws-sdk/client-sso": "^3.986.0",
+    "@aws-sdk/client-sso-oidc": "^3.986.0",
+    "@aws-sdk/credential-providers": "^3.700.0",
+    "@smithy/shared-ini-file-loader": "^3.1.0",
+    "better-sqlite3": "^11.7.0",
+    "expr-eval": "^2.0.2",
+    "highlight.js": "^11.10.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "rehype-highlight": "^7.0.1",
+    "remark-gfm": "^4.0.0",
+    "uuid": "^10.0.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/expr-eval": "^1.0.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  }
+}

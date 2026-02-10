@@ -1,0 +1,29 @@
+appId: com.bedrock-chat.app
+productName: Bedrock Chat
+directories:
+  buildResources: resources
+  output: release
+files:
+  - dist
+  - dist-electron
+  - "!node_modules/**/*"
+  - node_modules/better-sqlite3/**/*
+asar: true
+mac:
+  target:
+    - dmg
+    - zip
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  category: public.app-category.productivity
+win:
+  target:
+    - nsis
+  artifactName: "${productName}-${version}-setup.${ext}"
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+extraResources:
+  - from: resources/
+    to: resources/
+    filter:
+      - "**/*"
