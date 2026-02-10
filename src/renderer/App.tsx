@@ -10,6 +10,7 @@ import ChatView from './components/ChatView';
 import SettingsPanel from './components/SettingsPanel';
 import { useChatStore } from './stores/chat-store';
 import { ipc } from './lib/ipc-client';
+import { useAutoConnect } from './hooks/useAutoConnect';
 import type { ThemeId } from '../shared/types';
 
 /** Theme identifiers the app recognizes when restoring a saved preference. */
@@ -34,6 +35,8 @@ export default function App() {
   const setTheme = useChatStore((s) => s.setTheme);
   const setSystemPrompt = useChatStore((s) => s.setSystemPrompt);
   const [titlebar, setTitlebar] = useState('');
+
+  useAutoConnect();
 
   useEffect(() => {
     ipc.getSetting('theme').then((saved) => {

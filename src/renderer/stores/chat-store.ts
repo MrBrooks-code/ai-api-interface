@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { ChatMessage, ContentBlock, Conversation, ConnectionStatus, BedrockModel, ThemeId } from '../../shared/types';
+import type { ChatMessage, ContentBlock, Conversation, ConnectionStatus, BedrockModel, ThemeId, SsoLoginStatus } from '../../shared/types';
 
 /** Default system prompt used when the user hasn't customized one yet. */
 export const DEFAULT_SYSTEM_PROMPT =
@@ -63,6 +63,12 @@ interface ChatState {
   // Messages loading
   messagesLoading: boolean;
   setMessagesLoading: (loading: boolean) => void;
+
+  // Auto-connect
+  autoConnecting: boolean;
+  autoConnectSsoStatus: SsoLoginStatus | null;
+  setAutoConnecting: (connecting: boolean) => void;
+  setAutoConnectSsoStatus: (status: SsoLoginStatus | null) => void;
 
   // Settings panel
   showSettings: boolean;
@@ -234,6 +240,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Messages loading
   messagesLoading: false,
   setMessagesLoading: (loading) => set({ messagesLoading: loading }),
+
+  // Auto-connect
+  autoConnecting: false,
+  autoConnectSsoStatus: null,
+  setAutoConnecting: (connecting) => set({ autoConnecting: connecting }),
+  setAutoConnectSsoStatus: (status) => set({ autoConnectSsoStatus: status }),
 
   // Settings panel
   showSettings: false,

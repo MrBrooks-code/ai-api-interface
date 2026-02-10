@@ -23,6 +23,9 @@ const DEFAULT_BANNER: LoginBanner = {
 export default function ChatView() {
   const { messages, isStreaming, sendMessage, abortStream } = useChat();
   const connectionStatus = useChatStore((s) => s.connectionStatus);
+  const autoConnecting = useChatStore((s) => s.autoConnecting);
+  const autoConnectSsoStatus = useChatStore((s) => s.autoConnectSsoStatus);
+  const setShowSettings = useChatStore((s) => s.setShowSettings);
   const [banner, setBanner] = useState<LoginBanner>(DEFAULT_BANNER);
 
   useEffect(() => {
@@ -33,9 +36,50 @@ export default function ChatView() {
     });
   }, []);
 
+  const ssoStage = autoConnectSsoStatus?.stage;
+  const showOverlay = autoConnecting && ssoStage !== undefined;
+
   return (
     <div className="flex flex-col h-full pt-8">
-      {messages.length === 0 ? (
+      {showOverlay ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center max-w-md px-4">
+            {ssoStage === 'error' ? (
+              <>
+                <p className="text-accent-red text-base font-medium mb-2">
+                  Connection failed
+                </p>
+                <p className="text-text-muted text-sm mb-4">
+                  {autoConnectSsoStatus?.error ?? 'An unknown error occurred.'}
+                </p>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="text-accent text-sm underline hover:no-underline"
+                >
+                  Open Settings
+                </button>
+              </>
+            ) : ssoStage === 'polling' && autoConnectSsoStatus?.userCode ? (
+              <>
+                <p className="text-text-muted text-sm mb-3">
+                  Complete sign-in in your browser
+                </p>
+                <p className="text-text font-mono text-3xl font-bold tracking-widest mb-3">
+                  {autoConnectSsoStatus.userCode}
+                </p>
+                <p className="text-text-muted text-xs">
+                  Waiting for authorization…
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="inline-block w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-text-muted text-sm">Connecting to AWS…</p>
+              </>
+            )}
+          </div>
+        </div>
+      ) : messages.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md px-4">
             <h1 className="text-2xl font-semibold text-text mb-2">{banner.title}</h1>
