@@ -18,6 +18,8 @@ export const ipc = {
   setModel: (modelId: string) => getAPI().setModel(modelId),
   onSsoStatus: (callback: Parameters<typeof window.electronAPI.onSsoStatus>[0]) =>
     getAPI().onSsoStatus(callback),
+  onSessionExpired: (callback: Parameters<typeof window.electronAPI.onSessionExpired>[0]) =>
+    getAPI().onSessionExpired(callback),
 
   // SSO Wizard
   listSsoConfigs: () => getAPI().listSsoConfigs(),

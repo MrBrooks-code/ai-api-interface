@@ -85,4 +85,13 @@ export function useAutoConnect() {
       cleanupSsoListener?.();
     };
   }, []);
+
+  // Listen for session-expiry events pushed from the main process and
+  // reset the connection state so the UI reflects disconnection.
+  useEffect(() => {
+    const cleanup = ipc.onSessionExpired(() => {
+      useChatStore.getState().setConnectionStatus({ connected: false });
+    });
+    return cleanup;
+  }, []);
 }

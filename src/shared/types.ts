@@ -184,6 +184,8 @@ export interface LoginBanner {
 /** IT-managed application configuration loaded from `resources/admin-config.json`. */
 export interface AdminConfig {
   loginBanner: LoginBanner;
+  /** Maximum session duration in minutes before auto-disconnect. Default: 60. */
+  sessionDurationMinutes: number;
 }
 
 // --- App Settings ---

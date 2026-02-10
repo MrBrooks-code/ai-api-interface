@@ -17,7 +17,9 @@ import {
   getSsoConfigId,
   getSsoConfigName,
   disconnect,
+  startSessionTimer,
 } from './credential-manager';
+import { getMainWindow } from './index';
 import {
   performSsoDeviceAuth,
   listSsoAccounts,
@@ -67,6 +69,11 @@ export function registerIpcHandlers() {
       // Forward SSO progress to renderer so UI can show status
       await connectWithProfile(profile, region, (progress) => {
         window?.webContents.send(IPC.AWS_SSO_STATUS, progress);
+      });
+
+      const { sessionDurationMinutes } = getAdminConfig();
+      startSessionTimer(sessionDurationMinutes, () => {
+        getMainWindow()?.webContents.send(IPC.AWS_SESSION_EXPIRED);
       });
 
       return { success: true };
@@ -183,6 +190,12 @@ export function registerIpcHandlers() {
       await connectWithSsoConfig(config, (progress) => {
         window?.webContents.send(IPC.AWS_SSO_STATUS, progress);
       });
+
+      const { sessionDurationMinutes } = getAdminConfig();
+      startSessionTimer(sessionDurationMinutes, () => {
+        getMainWindow()?.webContents.send(IPC.AWS_SESSION_EXPIRED);
+      });
+
       return { success: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'SSO connection failed';

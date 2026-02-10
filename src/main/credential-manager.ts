@@ -24,6 +24,7 @@ let currentProfile: string | null = null;
 let currentRegion: string | null = null;
 let currentSsoConfigId: string | null = null;
 let currentSsoConfigName: string | null = null;
+let sessionTimer: NodeJS.Timeout | null = null;
 
 /**
  * Discovers AWS profiles from `~/.aws/config` and `~/.aws/credentials`.
@@ -80,6 +81,7 @@ export async function connectWithProfile(
   region: string,
   onSsoProgress?: (progress: SsoLoginProgress) => void
 ): Promise<void> {
+  clearSessionTimer();
   const ssoConfig = await getSsoConfigForProfile(profile);
 
   if (ssoConfig) {
@@ -110,6 +112,7 @@ export async function connectWithSsoConfig(
   config: SsoConfiguration,
   onSsoProgress?: (progress: SsoLoginProgress) => void
 ): Promise<void> {
+  clearSessionTimer();
   if (!config.accountId || !config.roleName) {
     throw new Error('SSO config is missing accountId or roleName');
   }
@@ -175,6 +178,7 @@ export function isConnected(): boolean {
  * defense-in-depth — see SI-F02 in SECURITY-REVIEW.MD).
  */
 export function disconnect(): void {
+  clearSessionTimer();
   if (resolvedCredentials) {
     // Overwrite credential values before clearing reference (best-effort zeroization).
     // Cast needed because AwsCredentialIdentity fields are readonly.
@@ -190,4 +194,26 @@ export function disconnect(): void {
   currentRegion = null;
   currentSsoConfigId = null;
   currentSsoConfigName = null;
+}
+
+/**
+ * Starts a timer that auto-disconnects after the given duration.
+ * When the timer fires, credentials are zeroized via {@link disconnect}
+ * and the provided callback is invoked so the renderer can be notified.
+ */
+export function startSessionTimer(durationMinutes: number, onExpired: () => void): void {
+  clearSessionTimer();
+  sessionTimer = setTimeout(() => {
+    sessionTimer = null;
+    disconnect();
+    onExpired();
+  }, durationMinutes * 60 * 1000);
+}
+
+/** Cancels the session-duration timer if one is running. */
+export function clearSessionTimer(): void {
+  if (sessionTimer) {
+    clearTimeout(sessionTimer);
+    sessionTimer = null;
+  }
 }

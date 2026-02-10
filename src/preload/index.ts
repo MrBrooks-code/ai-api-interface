@@ -46,6 +46,12 @@ const electronAPI = {
     return () => ipcRenderer.removeListener(IPC.AWS_SSO_STATUS, handler);
   },
 
+  onSessionExpired: (callback: () => void): (() => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IPC.AWS_SESSION_EXPIRED, handler);
+    return () => ipcRenderer.removeListener(IPC.AWS_SESSION_EXPIRED, handler);
+  },
+
   // --- SSO Configuration Wizard ---
   listSsoConfigs: (): Promise<SsoConfiguration[]> =>
     ipcRenderer.invoke(IPC.SSO_LIST_CONFIGS),

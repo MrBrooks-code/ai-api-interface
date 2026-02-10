@@ -17,6 +17,7 @@ export const IPC = {
   AWS_SET_MODEL: 'aws:set-model',
   AWS_SSO_LOGIN: 'aws:sso-login',
   AWS_SSO_STATUS: 'aws:sso-status',
+  AWS_SESSION_EXPIRED: 'aws:session-expired',
 
   // SSO configuration wizard
   SSO_LIST_CONFIGS: 'sso:list-configs',

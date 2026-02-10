@@ -16,6 +16,7 @@ const DEFAULT_CONFIG: AdminConfig = {
     message: 'Chat with Claude Sonnet 4.5 via Amazon Bedrock',
     titlebar: 'Bedrock Chat',
   },
+  sessionDurationMinutes: 60,
 };
 
 let cachedConfig: AdminConfig | null = null;
@@ -41,6 +42,10 @@ export function getAdminConfig(): AdminConfig {
     const raw = fs.readFileSync(configPath, 'utf-8');
     const parsed = JSON.parse(raw);
 
+    const parsedDuration = parsed?.sessionDurationMinutes;
+    const isValidDuration =
+      typeof parsedDuration === 'number' && parsedDuration > 0 && Number.isFinite(parsedDuration);
+
     cachedConfig = {
       loginBanner: {
         title:
@@ -56,6 +61,9 @@ export function getAdminConfig(): AdminConfig {
             ? parsed.loginBanner.titlebar
             : DEFAULT_CONFIG.loginBanner.titlebar,
       },
+      sessionDurationMinutes: isValidDuration
+        ? parsedDuration
+        : DEFAULT_CONFIG.sessionDurationMinutes,
     };
   } catch {
     cachedConfig = { ...DEFAULT_CONFIG };
