@@ -26,23 +26,23 @@ The application follows a strict security architecture: AWS credentials are reso
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                   Electron Main Process                   │
+│                   Electron Main Process                  │
 │                                                          │
 │  credential-manager ── AWS credential resolution         │
 │  sso-auth ──────────── Device auth flow + token cache    │
-│  bedrock-client ────── AWS SDK client instances           │
-│  bedrock-stream ────── Converse API streaming             │
-│  store ─────────────── SQLite via better-sqlite3          │
-│  tool-executor ─────── Safe tool execution                │
-│  file-handler ──────── Dialog + validated file reads      │
-│  admin-config ──────── IT-managed banner configuration    │
+│  bedrock-client ────── AWS SDK client instances          │
+│  bedrock-stream ────── Converse API streaming            │
+│  store ─────────────── SQLite via better-sqlite3         │
+│  tool-executor ─────── Safe tool execution               │
+│  file-handler ──────── Dialog + validated file reads     │
+│  admin-config ──────── IT-managed banner configuration   │
 │                                                          │
 ├──────────── contextBridge (preload) ─────────────────────┤
 │                                                          │
-│                  Renderer Process (React)                  │
-│  Components, Zustand store, IPC client wrapper            │
-│  contextIsolation: true │ nodeIntegration: false          │
-│  sandbox: true                                            │
+│                  Renderer Process (React)                │
+│  Components, Zustand store, IPC client wrapper           │
+│  contextIsolation: true │ nodeIntegration: false         │
+│  sandbox: true                                           │
 └──────────────────────────────────────────────────────────┘
 ```
 
