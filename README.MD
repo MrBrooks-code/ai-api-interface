@@ -8,6 +8,8 @@ Bedrock Chat provides a native desktop interface to Amazon Bedrock's Converse AP
 
 The application follows a strict security architecture: AWS credentials are resolved and held exclusively in the Electron main process and never cross into the renderer. The renderer runs fully sandboxed with context isolation enabled, communicating only through a typed IPC bridge.
 
+![Bedrock Chat — main interface with admin banner and conversation sidebar](assets/image.png)
+
 ## Features
 
 - **Streaming chat** with token-by-token response rendering via the Bedrock Converse API
