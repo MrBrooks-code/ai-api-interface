@@ -80,8 +80,8 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
   }, []);
 
   return (
-    <div className="border-t border-surface-lighter p-4">
-      <div className="max-w-3xl mx-auto">
+    <div className="border-t border-surface-lighter px-4 sm:px-6 lg:px-8 py-4">
+      <div className="max-w-4xl w-full mx-auto">
         {/* File previews */}
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">

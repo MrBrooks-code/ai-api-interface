@@ -121,10 +121,10 @@ export default function MessageBubble({ message, isStreaming }: Props) {
       </div>
 
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+        className={`rounded-2xl px-4 py-3 overflow-hidden ${
           isUser
-            ? 'bg-primary/20 text-text'
-            : 'bg-surface-light text-text'
+            ? 'max-w-[85%] bg-primary/20 text-text'
+            : 'max-w-full bg-surface-light text-text'
         }`}
       >
         <div className="space-y-2">

@@ -40,7 +40,7 @@ export default function ChatView() {
   const showOverlay = autoConnecting && ssoStage !== undefined;
 
   return (
-    <div className="flex flex-col h-full pt-8">
+    <div className="flex flex-col h-full">
       {showOverlay ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md px-4">

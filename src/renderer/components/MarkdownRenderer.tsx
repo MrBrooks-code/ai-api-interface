@@ -1,6 +1,8 @@
 /**
  * @fileoverview Renders a markdown string with GitHub-Flavored Markdown
  * tables/task lists and syntax-highlighted code fences via highlight.js.
+ * Styled for a polished, ChatGPT-like reading experience with soft edges,
+ * a dedicated code-block header bar, and clean typography.
  */
 
 import React, { useMemo, useRef, useState } from 'react';
@@ -25,7 +27,7 @@ function extractLanguage(children: React.ReactNode): string | null {
   return null;
 }
 
-/** Fenced code block with a copy button and optional language label. */
+/** Fenced code block with a header bar containing the language label and copy button. */
 function CodeBlock({ children, ...props }: React.ComponentPropsWithoutRef<'pre'>) {
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
@@ -40,22 +42,23 @@ function CodeBlock({ children, ...props }: React.ComponentPropsWithoutRef<'pre'>
   };
 
   return (
-    <div className="relative group my-2">
-      {language && (
-        <span className="absolute top-2 left-3 text-[10px] uppercase tracking-wide text-text-dim select-none z-10">
-          {language}
+    <div className="code-block-wrapper my-3 rounded-xl overflow-hidden border border-white/[0.06]">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[var(--color-code-bg)] border-b border-white/[0.06]">
+        <span className="text-xs text-text-muted select-none">
+          {language ?? 'code'}
         </span>
-      )}
-      <button
-        onClick={handleCopy}
-        className="absolute top-2 right-2 z-10 px-2 py-1 text-xs rounded bg-surface-lighter/80 text-text-muted
-          opacity-0 group-hover:opacity-100 transition-opacity hover:bg-surface-lighter hover:text-text"
-      >
-        {copied ? 'Copied!' : 'Copy'}
-      </button>
+        <button
+          onClick={handleCopy}
+          className="text-xs text-text-muted hover:text-text transition-colors"
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      {/* Code body */}
       <pre
         ref={preRef}
-        className="bg-[var(--color-code-bg)] rounded-lg overflow-x-auto"
+        className="bg-[var(--color-code-bg)] overflow-x-auto !mt-0 !rounded-none"
         {...props}
       >
         {children}
@@ -84,7 +87,11 @@ export default function MarkdownRenderer({ content }: Props) {
             const isInline = !className;
             if (isInline) {
               return (
-                <code className="bg-surface-lighter px-1.5 py-0.5 rounded text-sm" {...props}>
+                <code
+                  className="inline-code px-1.5 py-0.5 rounded-md text-[0.875em] font-mono
+                    bg-surface-lighter/70 text-text-muted"
+                  {...props}
+                >
                   {children}
                 </code>
               );
@@ -95,6 +102,11 @@ export default function MarkdownRenderer({ content }: Props) {
               </code>
             );
           },
+          table: ({ children, ...props }) => (
+            <div className="overflow-x-auto my-3 rounded-xl border border-white/[0.06]">
+              <table {...props}>{children}</table>
+            </div>
+          ),
         }}
       >
         {content}
