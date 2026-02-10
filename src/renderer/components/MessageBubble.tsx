@@ -105,20 +105,21 @@ export default function MessageBubble({ message, isStreaming }: Props) {
 
   return (
     <div className={`group/msg relative flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {/* Hover action bar */}
-      <div
-        className={`absolute -top-8 z-10 flex items-center gap-1 px-2 py-1
-          bg-surface-lighter rounded-lg shadow-sm
-          opacity-0 group-hover/msg:opacity-100 transition-opacity
-          ${isUser ? 'right-0' : 'left-0'}`}
-      >
-        <button
-          onClick={handleCopyMessage}
-          className="text-xs text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-light transition-colors"
+      {/* Hover action bar — assistant messages only */}
+      {!isUser && (
+        <div
+          className="absolute -top-8 left-0 z-10 flex items-center gap-1 px-2 py-1
+            bg-surface-lighter rounded-lg shadow-sm
+            opacity-0 group-hover/msg:opacity-100 transition-opacity"
         >
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
-      </div>
+          <button
+            onClick={handleCopyMessage}
+            className="text-xs text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-light transition-colors"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      )}
 
       <div
         className={`rounded-2xl px-4 py-3 overflow-hidden ${
