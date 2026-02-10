@@ -20,8 +20,10 @@ export function useConversations() {
   }, []);
 
   const loadMessages = useCallback(async (conversationId: string) => {
+    store.setMessagesLoading(true);
     const messages = await ipc.getMessages(conversationId);
     store.setMessages(messages);
+    store.setMessagesLoading(false);
     store.setActiveConversation(conversationId);
   }, []);
 

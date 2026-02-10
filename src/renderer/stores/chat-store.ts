@@ -60,6 +60,10 @@ interface ChatState {
   systemPrompt: string;
   setSystemPrompt: (prompt: string) => void;
 
+  // Messages loading
+  messagesLoading: boolean;
+  setMessagesLoading: (loading: boolean) => void;
+
   // Settings panel
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
@@ -226,6 +230,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // System prompt
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   setSystemPrompt: (prompt) => set({ systemPrompt: prompt }),
+
+  // Messages loading
+  messagesLoading: false,
+  setMessagesLoading: (loading) => set({ messagesLoading: loading }),
 
   // Settings panel
   showSettings: false,

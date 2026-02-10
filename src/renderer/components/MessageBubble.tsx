@@ -4,7 +4,7 @@
  * image, or document preview).
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 import ToolCallCard from './ToolCallCard';
 import FilePreview from './FilePreview';
@@ -15,6 +15,14 @@ interface Props {
   message: ChatMessage;
   isLast: boolean;
   isStreaming: boolean;
+}
+
+/** Formats a Unix-ms timestamp to a localized time string (e.g. "2:30 PM"). */
+function formatTime(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 /** Routes a single content block to the correct visual component. */
@@ -53,6 +61,23 @@ function renderBlock(block: ContentBlock, index: number) {
 /** Renders a single chat message with alignment based on role. */
 export default function MessageBubble({ message, isStreaming }: Props) {
   const isUser = message.role === 'user';
+  const [copied, setCopied] = useState(false);
+
+  // Detect whether any block has visible content
+  const hasVisibleContent = message.content.some(
+    (b) => (b.type === 'text' && b.text.length > 0) || b.type !== 'text'
+  );
+
+  /** Copies all text blocks in the message to the clipboard. */
+  const handleCopyMessage = async () => {
+    const text = message.content
+      .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+      .map((b) => b.text)
+      .join('\n');
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Don't show messages that only contain tool results (they're displayed inline)
   const hasOnlyToolResults = message.content.every((b) => b.type === 'toolResult');
@@ -64,8 +89,37 @@ export default function MessageBubble({ message, isStreaming }: Props) {
     );
   }
 
+  // Thinking state — render as standalone animated text, no bubble
+  if (isStreaming && !hasVisibleContent) {
+    return (
+      <div className="flex justify-start">
+        <div className="flex items-center gap-1 px-4 py-2 text-text-muted text-sm">
+          <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
+          <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
+          <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
+          <span className="ml-1.5 italic text-text-muted">Thinking…</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`group/msg relative flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      {/* Hover action bar */}
+      <div
+        className={`absolute -top-8 z-10 flex items-center gap-1 px-2 py-1
+          bg-surface-lighter rounded-lg shadow-sm
+          opacity-0 group-hover/msg:opacity-100 transition-opacity
+          ${isUser ? 'right-0' : 'left-0'}`}
+      >
+        <button
+          onClick={handleCopyMessage}
+          className="text-xs text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-light transition-colors"
+        >
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-3 ${
           isUser
@@ -80,6 +134,11 @@ export default function MessageBubble({ message, isStreaming }: Props) {
         {isStreaming && (
           <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
         )}
+
+        {/* Message timestamp */}
+        <span className="text-[10px] text-text-dim mt-1 block">
+          {formatTime(message.timestamp)}
+        </span>
       </div>
     </div>
   );
