@@ -3,7 +3,7 @@
  * and the current AWS connection status indicator at the bottom.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useConversations } from '../hooks/useConversations';
 import { useChatStore } from '../stores/chat-store';
 
@@ -13,6 +13,13 @@ export default function Sidebar() {
     useConversations();
   const connectionStatus = useChatStore((s) => s.connectionStatus);
   const setShowSettings = useChatStore((s) => s.setShowSettings);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredConversations = searchQuery
+    ? conversations.filter((convo) =>
+        convo.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : conversations;
 
   return (
     <aside className="w-64 bg-surface-light flex flex-col border-r border-surface-lighter flex-shrink-0">
@@ -25,9 +32,22 @@ export default function Sidebar() {
         </button>
       </div>
 
+      {/* Search filter */}
+      {conversations.length > 0 && (
+        <div className="px-3 pb-2">
+          <input
+            type="text"
+            placeholder="Search conversations…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-surface rounded-lg px-3 py-2 text-sm text-text border border-surface-lighter focus:border-primary outline-none"
+          />
+        </div>
+      )}
+
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto px-2 py-1">
-        {conversations.map((convo) => (
+        {filteredConversations.map((convo) => (
           <div
             key={convo.id}
             className={`group flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors ${
@@ -53,6 +73,12 @@ export default function Sidebar() {
         {conversations.length === 0 && (
           <p className="text-text-dim text-xs text-center mt-8 px-4">
             No conversations yet. Start a new chat!
+          </p>
+        )}
+
+        {conversations.length > 0 && filteredConversations.length === 0 && (
+          <p className="text-text-dim text-xs text-center mt-8 px-4">
+            No matching conversations
           </p>
         )}
       </div>
