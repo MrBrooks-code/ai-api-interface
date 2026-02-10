@@ -3,9 +3,11 @@
  * and the current AWS connection status indicator at the bottom.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useConversations } from '../hooks/useConversations';
 import { useChatStore } from '../stores/chat-store';
+import { ipc } from '../lib/ipc-client';
+import type { Conversation } from '../../shared/types';
 
 /** Navigation sidebar with conversation history and connection status. */
 export default function Sidebar() {
@@ -14,12 +16,25 @@ export default function Sidebar() {
   const connectionStatus = useChatStore((s) => s.connectionStatus);
   const setShowSettings = useChatStore((s) => s.setShowSettings);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Conversation[] | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const filteredConversations = searchQuery
-    ? conversations.filter((convo) =>
-        convo.title.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : conversations;
+  // Debounced search via IPC — searches titles and message content in SQLite
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      const results = await ipc.searchConversations(searchQuery.trim());
+      setSearchResults(results);
+    }, 250);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [searchQuery]);
+
+  const displayedConversations = searchResults ?? conversations;
 
   return (
     <aside className="w-64 bg-surface-light flex flex-col border-r border-surface-lighter flex-shrink-0">
@@ -47,7 +62,7 @@ export default function Sidebar() {
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto px-2 py-1">
-        {filteredConversations.map((convo) => (
+        {displayedConversations.map((convo) => (
           <div
             key={convo.id}
             className={`group flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors ${
@@ -76,7 +91,7 @@ export default function Sidebar() {
           </p>
         )}
 
-        {conversations.length > 0 && filteredConversations.length === 0 && (
+        {conversations.length > 0 && displayedConversations.length === 0 && (
           <p className="text-text-dim text-xs text-center mt-8 px-4">
             No matching conversations
           </p>

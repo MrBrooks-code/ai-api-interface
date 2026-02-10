@@ -51,6 +51,7 @@ export const ipc = {
   createConversation: (id: string, title: string) => getAPI().createConversation(id, title),
   deleteConversation: (id: string) => getAPI().deleteConversation(id),
   updateConversationTitle: (id: string, title: string) => getAPI().updateConversationTitle(id, title),
+  searchConversations: (query: string) => getAPI().searchConversations(query),
   saveMessage: (message: Parameters<typeof window.electronAPI.saveMessage>[0]) =>
     getAPI().saveMessage(message),
   getMessages: (conversationId: string) => getAPI().getMessages(conversationId),

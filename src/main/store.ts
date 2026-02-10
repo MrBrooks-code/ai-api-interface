@@ -132,6 +132,30 @@ export function saveMessage(message: ChatMessage): void {
     .run(message.timestamp, message.conversationId);
 }
 
+/**
+ * Searches conversations by title or message text content. Returns conversations
+ * where the query matches the title or any text block inside a message.
+ */
+export function searchConversations(query: string): Conversation[] {
+  const pattern = `%${query}%`;
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT c.id, c.title, c.created_at, c.updated_at
+       FROM conversations c
+       LEFT JOIN messages m ON m.conversation_id = c.id
+       WHERE c.title LIKE ? OR m.content LIKE ?
+       ORDER BY c.updated_at DESC`
+    )
+    .all(pattern, pattern) as Array<{ id: string; title: string; created_at: number; updated_at: number }>;
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+}
+
 /** Returns all messages for a conversation in chronological order. */
 export function getMessages(conversationId: string): ChatMessage[] {
   const rows = db

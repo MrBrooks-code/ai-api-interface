@@ -108,6 +108,9 @@ const electronAPI = {
   updateConversationTitle: (id: string, title: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC.STORE_UPDATE_CONVERSATION_TITLE, id, title),
 
+  searchConversations: (query: string): Promise<Conversation[]> =>
+    ipcRenderer.invoke(IPC.STORE_SEARCH_CONVERSATIONS, query),
+
   saveMessage: (message: ChatMessage): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC.STORE_SAVE_MESSAGE, message),
 

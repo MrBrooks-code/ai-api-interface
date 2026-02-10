@@ -34,6 +34,7 @@ import {
   createConversation,
   deleteConversation,
   updateConversationTitle,
+  searchConversations,
   saveMessage,
   getMessages,
   listSsoConfigs,
@@ -233,6 +234,10 @@ export function registerIpcHandlers() {
   ipcMain.handle(IPC.STORE_UPDATE_CONVERSATION_TITLE, (_event, id: string, title: string) => {
     updateConversationTitle(id, title);
     return { success: true };
+  });
+
+  ipcMain.handle(IPC.STORE_SEARCH_CONVERSATIONS, (_event, query: string) => {
+    return searchConversations(query);
   });
 
   ipcMain.handle(IPC.STORE_SAVE_MESSAGE, (_event, message) => {
