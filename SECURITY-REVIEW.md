@@ -3,25 +3,28 @@
 **Application:** Bedrock Chat v1.0.0
 **Type:** Electron desktop application (cross-platform)
 **Purpose:** Chat interface for Amazon Bedrock LLM services
-**Review Date:** 2026-02-09
+**Review Date:** 2026-02-10 (updated)
+**Original Review:** 2026-02-09
 **Scope:** Full source code review against CMMC Level 2 (NIST SP 800-171) controls
 
 ---
 
 ## Executive Summary
 
-Bedrock Chat is an Electron-based desktop application that provides a chat interface to AWS Bedrock. The application follows a sound architectural pattern — credentials and sensitive operations are isolated in the main process, the renderer is locked down with `contextIsolation` and disabled `nodeIntegration`, and database access uses parameterized queries throughout.
+Bedrock Chat is an Electron-based desktop application that provides a chat interface to AWS Bedrock. The application follows a sound architectural pattern — credentials and sensitive operations are isolated in the main process, the renderer is locked down with `contextIsolation`, `sandbox`, and disabled `nodeIntegration`, and database access uses parameterized queries throughout.
 
-However, the review identified **3 critical**, **4 high**, and **5 medium** severity findings that must be remediated before deployment in a CMMC-regulated environment. The most significant issues are: a code injection vector in the calculator tool, insufficient file permissions on cached SSO tokens, the Electron sandbox being disabled, and missing Content Security Policy headers.
+Since the original review on 2026-02-09, all **critical** and **high** severity findings have been remediated. Additionally, three **medium** severity findings (source maps, `.gitignore`, and plaintext credential IPC) have been closed — the manual AWS key entry flow was removed entirely in favor of SSO-only authentication.
+
+A comprehensive re-review on 2026-02-10 identified **4 new findings** (1 medium, 3 low) and confirmed closure of 4 previously open items.
 
 ### Risk Summary
 
 | Severity | Count | Status |
 |----------|-------|--------|
 | Critical | 3 | **ALL REMEDIATED** (2026-02-09) |
-| High | 5 | **4 REMEDIATED** (2026-02-09) — 1 remaining: AC-F02 (session timeout) |
-| Medium | 5 | Source maps in production, incomplete `.gitignore`, no IPC rate limiting, no audit logging, no code signing |
-| Low | 2 | Hardcoded code block theme color, error messages may leak system info |
+| High | 5 | **ALL REMEDIATED** (2026-02-09 / 2026-02-10) |
+| Medium | 5 | **5 REMEDIATED** (2026-02-10) — 2 remaining: AU-F01, CM-F02 |
+| Low | 5 | SC-F03, SC-F05, SI-F05, SI-F06, AC-F04 |
 
 ---
 
@@ -39,21 +42,24 @@ However, the review identified **3 critical**, **4 high**, and **5 medium** seve
 │  tool-executor.ts ─────── Built-in tool execution       │
 │  file-handler.ts ──────── File dialog + read            │
 │  ipc-handlers.ts ──────── IPC channel handlers          │
+│  admin-config.ts ──────── IT-managed config loader      │
 │                                                         │
 ├──────── contextBridge (preload/index.ts) ────────────────┤
 │                                                         │
 │                   Renderer Process (React)               │
 │  Components, Zustand store, IPC client wrapper           │
 │  contextIsolation: true | nodeIntegration: false         │
+│  sandbox: true                                           │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### Data Flow
 
-- **Credentials** are resolved and stored exclusively in the main process. They are never sent to the renderer. The renderer sends raw key material *to* the main process via IPC for the "Manual Keys" flow, but credentials never flow in the reverse direction.
+- **Credentials** are resolved and stored exclusively in the main process. They are never sent to the renderer. Authentication uses AWS CLI profiles or SSO only — no manual key entry.
 - **Chat messages** flow: Renderer → IPC → Main (Bedrock API) → stream events back to renderer via `webContents.send()`.
 - **Persistence** uses a local SQLite database at `app.getPath('userData')/bedrock-chat.db`. All queries use parameterized statements.
-- **SSO tokens** are cached to `~/.aws/sso/cache/` as JSON files (matches AWS CLI convention).
+- **SSO tokens** are cached to `~/.aws/sso/cache/` as JSON files with `0o600` permissions (matches AWS CLI convention).
+- **Session timeout** is enforced via a configurable timer (`sessionDurationMinutes` in `admin-config.json`, default 60 minutes). On expiry, credentials are zeroized and the renderer is notified.
 
 ---
 
@@ -63,7 +69,7 @@ However, the review identified **3 critical**, **4 high**, and **5 medium** seve
 
 #### AC-F01: Electron Sandbox Disabled — ~~CRITICAL~~ REMEDIATED ✅
 
-**Location:** `src/main/index.ts:24`
+**Location:** `src/main/index.ts:32`
 **Remediated:** 2026-02-09
 
 ```typescript
@@ -79,25 +85,26 @@ webPreferences: {
 
 ---
 
-#### AC-F02: No Session Timeout or Credential Expiration Enforcement — HIGH
+#### AC-F02: No Session Timeout or Credential Expiration Enforcement — ~~HIGH~~ REMEDIATED ✅
 
-**Location:** `src/main/credential-manager.ts:15-19`
-
-```typescript
-let resolvedCredentials: AwsCredentialIdentity | null = null;
-let currentProfile: string | null = null;
-let currentRegion: string | null = null;
-```
-
-**Impact:** Once credentials are loaded, they remain in memory indefinitely. There is no inactivity timeout, no maximum session duration, and no periodic re-validation. If a user walks away from an unlocked workstation, the application remains authenticated.
+**Location:** `src/main/credential-manager.ts`, `src/main/ipc-handlers.ts`, `resources/admin-config.json`
+**Remediated:** 2026-02-10
 
 **CMMC Control:** AC.L2-3.1.10 — Use session lock with pattern-hiding displays to prevent access and viewing of data after a period of inactivity.
 **CMMC Control:** AC.L2-3.1.11 — Terminate (automatically) a user session after a defined condition.
 
-**Recommendation:**
-1. Implement an inactivity timer that calls `disconnect()` after a configurable period (e.g., 15 minutes).
-2. For SSO-derived credentials, check `expiration` timestamps and force re-authentication when they expire.
-3. On disconnect, zeroize credential values before nullifying references (see SI-F01).
+**Fix applied:** Implemented configurable session duration via `admin-config.json`:
+
+1. Added `sessionDurationMinutes` field to `AdminConfig` type (default: 60 minutes)
+2. Added `startSessionTimer()` / `clearSessionTimer()` in `credential-manager.ts` — `setTimeout`-based timer that calls `disconnect()` (which zeroizes credentials) then notifies the renderer
+3. Timer starts after successful connection in both `AWS_CONNECT_PROFILE` and `SSO_CONNECT_WITH_CONFIG` IPC handlers
+4. Timer is cleared on manual disconnect, reconnection, or when it fires
+5. Renderer listens via `AWS_SESSION_EXPIRED` IPC channel and resets `connectionStatus` to `{ connected: false }`
+6. `sessionDurationMinutes` is validated as a positive finite number; invalid values fall back to 60
+
+**Files modified:** `src/shared/types.ts`, `resources/admin-config.json`, `src/shared/ipc-channels.ts`, `src/main/admin-config.ts`, `src/main/credential-manager.ts`, `src/main/ipc-handlers.ts`, `src/preload/index.ts`, `src/renderer/lib/ipc-client.ts`, `src/renderer/hooks/useAutoConnect.ts`
+
+**Remaining consideration:** This is a maximum session duration timer, not an inactivity timer. For full AC.L2-3.1.10 compliance, an inactivity-based timer (triggered by lack of user input) may also be warranted. The OS-level screen lock is the primary control for inactivity in most CMMC environments.
 
 ---
 
@@ -110,34 +117,49 @@ let currentRegion: string | null = null;
 
 ---
 
+#### AC-F04: No Electron Permission Request Handler — LOW (New)
+
+**Location:** `src/main/index.ts`
+
+**Impact:** No `session.defaultSession.setPermissionRequestHandler()` is configured. Electron's default behavior is to grant permission requests (camera, microphone, geolocation, notifications, etc.) from the renderer. While this application does not request any such permissions, a compromised renderer or injected script could request permissions that would be silently granted.
+
+**CMMC Control:** AC.L2-3.1.1 — Limit system access to authorized users, processes acting on behalf of authorized users, and devices.
+
+**Recommendation:** Add a blanket permission deny handler in `createWindow()`:
+```typescript
+const { session } = mainWindow.webContents;
+session.setPermissionRequestHandler((_webContents, _permission, callback) => {
+  callback(false); // Deny all permission requests
+});
+```
+
+---
+
 ### AU — Audit and Accountability
 
 #### AU-F01: No Audit Logging — MEDIUM
 
-**Impact:** The application does not produce any audit trail of security-relevant events: credential connections, disconnections, SSO authentications, data wipes, file accesses, or configuration changes. In a CMMC environment, these events must be logged and available for review.
+**Impact:** The application does not produce any audit trail of security-relevant events: credential connections, disconnections, SSO authentications, session timeouts, data wipes, file accesses, or configuration changes. In a CMMC environment, these events must be logged and available for review.
 
 **CMMC Control:** AU.L2-3.3.1 — Create and retain system audit logs and records to the extent needed to enable the monitoring, analysis, investigation, and reporting of unlawful or unauthorized system activity.
 **CMMC Control:** AU.L2-3.3.2 — Ensure that the actions of individual system users can be uniquely traced to those users.
 
-**Recommendation:** Implement structured audit logging (JSON lines to a local log file) for: connection/disconnection events, SSO auth attempts (success/failure), data wipe operations, settings changes, and file access. Include timestamps and relevant context. Consider integration with the OS event log (Windows Event Log / macOS Unified Logging) for centralized collection.
+**Recommendation:** Implement structured audit logging (JSON lines to a local log file) for: connection/disconnection events, SSO auth attempts (success/failure), session timeout events, data wipe operations, settings changes, and file access. Include timestamps and relevant context. Consider integration with the OS event log (Windows Event Log / macOS Unified Logging) for centralized collection.
 
 ---
 
 ### CM — Configuration Management
 
-#### CM-F01: Source Maps Enabled in Production — MEDIUM
+#### CM-F01: Source Maps Enabled in Production — ~~MEDIUM~~ REMEDIATED ✅
 
-**Location:** `tsconfig.json:17`
+**Location:** `vite.config.ts:18,35,58`
+**Remediated:** 2026-02-10 (verified — was already fixed in Vite config)
 
-```json
-"sourceMap": true
+```typescript
+sourcemap: !isProduction,  // Disabled in production builds
 ```
 
-**Impact:** Source maps ship with production builds, allowing anyone with access to the application binary to reconstruct the original TypeScript source code. This reveals internal logic, API patterns, and implementation details.
-
-**CMMC Control:** CM.L2-3.4.6 — Employ the principle of least functionality by configuring organizational systems to provide only essential capabilities.
-
-**Recommendation:** Disable source maps for production builds. Either set `"sourceMap": false` or configure the Vite build to strip them. Source maps can remain enabled in development.
+**Fix confirmed:** The Vite config conditionally disables source maps for all three build targets (main, preload, renderer) when `NODE_ENV === 'production'`. The `tsconfig.json` still has `"sourceMap": true` but this is only used by `tsc --noEmit` for type checking and does not affect the Vite production build output.
 
 ---
 
@@ -167,21 +189,12 @@ win:
 
 ---
 
-#### CM-F03: Incomplete `.gitignore` — MEDIUM
+#### CM-F03: Incomplete `.gitignore` — ~~MEDIUM~~ REMEDIATED ✅
 
 **Location:** `.gitignore`
+**Remediated:** 2026-02-10 (verified — was already updated)
 
-**Current contents:**
-```
-node_modules/
-dist/
-dist-electron/
-release/
-*.log
-.DS_Store
-```
-
-**Missing entries that could lead to accidental secret commits:**
+**Current `.gitignore`** now includes comprehensive secret exclusion patterns:
 ```
 .env
 .env.*
@@ -193,32 +206,19 @@ release/
 credentials.json
 ```
 
-**CMMC Control:** CM.L2-3.4.2 — Establish and enforce security configuration settings for information technology products employed in organizational systems.
-
 ---
 
 ### IA — Identification and Authentication
 
-#### IA-F01: Credentials Accepted as Plaintext via IPC — MEDIUM
+#### IA-F01: Credentials Accepted as Plaintext via IPC — ~~MEDIUM~~ REMEDIATED ✅
 
-**Location:** `src/main/ipc-handlers.ts:66-78`
+**Remediated:** 2026-02-10 (verified — manual keys flow was removed from codebase)
 
-```typescript
-ipcMain.handle(
-  IPC.AWS_CONNECT_KEYS,
-  async (_event, accessKeyId: string, secretAccessKey: string,
-         region: string, sessionToken?: string) => {
-    // ...
-    await connectWithKeys(accessKeyId, secretAccessKey, region, sessionToken);
-  }
-);
-```
+The `AWS_CONNECT_KEYS` IPC channel and `connectWithKeys()` function have been completely removed. The application now supports only two authentication methods:
+1. AWS CLI profiles (via `fromIni()` / `fromSSO()` credential providers)
+2. Saved SSO configurations (via IAM Identity Center device authorization)
 
-**Impact:** When using the "Manual Keys" connection method, raw `accessKeyId` and `secretAccessKey` values transit from the renderer process to the main process via Electron IPC. While this is an in-process communication channel (not network-exposed), the credential values exist in the renderer's JavaScript heap, which is a less-trusted context.
-
-**CMMC Control:** IA.L2-3.5.10 — Store and transmit only cryptographically-protected passwords.
-
-**Recommendation:** Consider using the OS keychain (via a package like `safeStorage` from Electron or `keytar`) for credential storage, or encrypt credentials in the renderer before transmission. For CMMC environments, AWS SSO (IAM Identity Center) is the preferred authentication method as it avoids long-lived static keys entirely.
+Both methods avoid raw credential transit through the renderer. This fully addresses IA.L2-3.5.10.
 
 ---
 
@@ -226,14 +226,14 @@ ipcMain.handle(
 
 #### MP-F01: SQLite Database Unencrypted at Rest — MEDIUM
 
-**Location:** `src/main/store.ts:9`
+**Location:** `src/main/store.ts:17-18`
 
 ```typescript
 const dbPath = path.join(app.getPath('userData'), 'bedrock-chat.db');
 db = new Database(dbPath);
 ```
 
-**Impact:** The SQLite database stores all conversation history, message content (which may contain CUI), and SSO configuration details in plaintext on disk. If the workstation is lost, stolen, or accessed by an unauthorized user, this data is fully readable.
+**Impact:** The SQLite database stores all conversation history, message content (which may contain CUI), SSO configuration details, and uploaded file content (base64-encoded) in plaintext on disk. If the workstation is lost, stolen, or accessed by an unauthorized user, this data is fully readable.
 
 **CMMC Control:** MP.L2-3.8.9 — Protect the confidentiality of backup CUI at storage locations.
 
@@ -272,23 +272,13 @@ This blocks external scripts, external connections, object/embed tags, and restr
 2. Cache files written with `mode: 0o600` (owner read/write only)
 3. Removed `clientId`, `clientSecret`, and `registrationExpiresAt` from persisted cache data — OIDC client is re-registered on each auth flow
 
-**Updated cached file contents:**
-```json
-{
-  "accessToken": "...",
-  "expiresAt": "...",
-  "region": "...",
-  "startUrl": "..."
-}
-```
-
 **Remaining recommendation:** Consider using Electron's `safeStorage` API to encrypt the access token before writing to disk for additional defense-in-depth.
 
 ---
 
 #### SC-F03: No Explicit TLS Configuration — LOW
 
-**Location:** `src/main/bedrock-client.ts:24-27`
+**Location:** `src/main/bedrock-client.ts:31-34`
 
 ```typescript
 runtimeClient = new BedrockRuntimeClient({
@@ -303,7 +293,7 @@ runtimeClient = new BedrockRuntimeClient({
 
 **Mitigating Factor:** AWS SDK v3 enforces TLS 1.2+ by default. AWS service endpoints only accept TLS 1.2+. The risk here is theoretical.
 
-**Recommendation:** For GovCloud deployments, explicitly configure the SDK with `tls: true` and consider adding a custom HTTPS agent that enforces TLS 1.3 where supported:
+**Recommendation:** For GovCloud deployments, explicitly configure a custom HTTPS agent that enforces TLS 1.2+:
 ```typescript
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import https from 'https';
@@ -311,6 +301,34 @@ import https from 'https';
 const handler = new NodeHttpHandler({
   httpsAgent: new https.Agent({ minVersion: 'TLSv1.2' }),
 });
+```
+
+---
+
+#### SC-F04: Unvalidated URLs Passed to `shell.openExternal()` — ~~MEDIUM~~ REMEDIATED ✅
+
+**Locations:** `src/main/index.ts`, `src/main/sso-auth.ts`
+**Remediated:** 2026-02-10
+
+**Fix applied:** Created `src/main/safe-open.ts` with a `safeOpenExternal()` function that parses URLs and validates the scheme against an allowlist (`https:` and `http:` only). Malformed or non-HTTP(S) URLs are silently blocked and logged. All four `shell.openExternal()` call sites (2 in `index.ts`, 2 in `sso-auth.ts`) now use `safeOpenExternal()` instead.
+
+**Files modified:** `src/main/safe-open.ts` (new), `src/main/index.ts`, `src/main/sso-auth.ts`
+
+---
+
+#### SC-F05: CSP Missing `blob:` in `img-src` Directive — LOW (New)
+
+**Location:** `src/renderer/index.html:10`
+
+```
+img-src 'self' data:;
+```
+
+**Impact:** The `FilePreview.tsx` component creates blob URLs via `URL.createObjectURL()` for rendering image thumbnails and inline image blocks. The current CSP `img-src` directive does not include `blob:`, which means Chromium may block these images in production builds. This is primarily a functional issue but also represents a CSP misconfiguration.
+
+**Recommendation:** Update the CSP `img-src` directive to include `blob:`:
+```
+img-src 'self' data: blob:;
 ```
 
 ---
@@ -324,16 +342,6 @@ const handler = new NodeHttpHandler({
 
 **Fix applied:** Removed the `Function()` constructor entirely. Replaced with the `expr-eval` library (`Parser.evaluate()`), which is a safe sandboxed expression parser that supports arithmetic, common math functions (sqrt, pow, abs, ceil, floor, round, log, sin, cos, tan, min, max), and nothing else — no prototype access, no global scope, no code execution.
 
-```typescript
-import { Parser } from 'expr-eval';
-const mathParser = new Parser();
-
-// In calculator execute:
-const result = mathParser.evaluate(expr);
-```
-
-The unsafe regex allowlist and `Function()` call have been completely removed. The AI model's expression syntax changed from `Math.sqrt(16)` to `sqrt(16)` — the tool description has been updated accordingly.
-
 ---
 
 #### SI-F02: No Credential Zeroization on Disconnect — ~~HIGH~~ REMEDIATED ✅
@@ -341,7 +349,7 @@ The unsafe regex allowlist and `Function()` call have been completely removed. T
 **Location:** `src/main/credential-manager.ts`
 **Remediated:** 2026-02-09
 
-**Fix applied:** The `disconnect()` function now overwrites `accessKeyId`, `secretAccessKey`, and `sessionToken` with empty strings on the credential object before nullifying the reference. A `Mutable<>` type cast is used to bypass the AWS SDK's `readonly` property modifiers for this security operation.
+**Fix applied:** The `disconnect()` function now overwrites `accessKeyId`, `secretAccessKey`, and `sessionToken` with empty strings on the credential object before nullifying the reference. A type cast is used to bypass the AWS SDK's `readonly` property modifiers for this security operation.
 
 **Caveat (unchanged):** JavaScript string immutability means true zeroization is impossible in V8 — the original string values may persist in the heap until GC'd. For maximum security in a CUI environment, consider storing credentials in a native module with explicit memory management, or using Electron's `safeStorage`.
 
@@ -356,15 +364,59 @@ The unsafe regex allowlist and `Function()` call have been completely removed. T
 
 ---
 
-#### SI-F04: No IPC Rate Limiting — MEDIUM
+#### SI-F04: No IPC Rate Limiting — ~~MEDIUM~~ REMEDIATED ✅
 
-**Location:** `src/main/ipc-handlers.ts` (all handlers)
+**Location:** `src/main/ipc-handlers.ts`
+**Remediated:** 2026-02-10
 
-**Impact:** All IPC handlers can be called at unlimited rate from the renderer. A compromised or malfunctioning renderer could spam AWS API calls (incurring costs and potential throttling), exhaust SQLite connections, or flood the file system with read operations.
+**Fix applied:** Created `src/main/ipc-rate-limiter.ts` with a sliding-window `checkRateLimit()` function that tracks request timestamps per logical channel. Rate limit checks added to the six most expensive IPC handlers:
 
-**CMMC Control:** SI.L2-3.14.6 — Monitor organizational systems, including inbound and outbound communications traffic, to detect attacks and indicators of potential attacks.
+| Handler | Limit | Window | Rationale |
+|---------|-------|--------|-----------|
+| `CHAT_SEND_MESSAGE` | 10 | 10 s | Most expensive — invokes Bedrock streaming |
+| `TOOL_EXECUTE` | 20 | 10 s | Runs arbitrary tool logic |
+| `FILE_READ` | 30 | 10 s | Filesystem access |
+| `AWS_CONNECT_PROFILE` | 3 | 30 s | Triggers full auth flow |
+| `SSO_CONNECT_WITH_CONFIG` | 3 | 30 s | Triggers full auth flow |
+| `SSO_START_DEVICE_AUTH` | 3 | 30 s | Triggers OIDC device flow |
 
-**Recommendation:** Implement per-channel rate limiting, particularly on `CHAT_SEND_MESSAGE`, `TOOL_EXECUTE`, `FILE_READ`, and the AWS connection handlers.
+Exceeded requests return a structured error result matching each handler's existing error format. Normal usage at reasonable pace is unaffected.
+
+**Files modified:** `src/main/ipc-rate-limiter.ts` (new), `src/main/ipc-handlers.ts`
+
+---
+
+#### SI-F05: SSO Tokens in Memory Not Zeroized on Disconnect — LOW (New)
+
+**Locations:**
+- `src/main/sso-auth.ts:243` — `tokenCache` Map
+- `src/main/ipc-handlers.ts:54` — `pendingWizardToken`
+
+**Impact:** The `tokenCache` Map in `sso-auth.ts` holds raw SSO access tokens keyed by start URL, and `pendingWizardToken` in `ipc-handlers.ts` holds the device auth result including the access token. Neither of these are cleared when `disconnect()` is called. SSO access tokens (typically valid for 8 hours) remain in memory after the user disconnects or the session times out.
+
+**CMMC Control:** SI.L2-3.14.3 — Monitor system security alerts and advisories and take action in response.
+
+**Recommendation:** Clear `pendingWizardToken` in the `SSO_DELETE_CONFIG` handler when disconnecting, and export a `clearTokenCache()` function from `sso-auth.ts` that is called by `disconnect()`.
+
+---
+
+#### SI-F06: Non-Secure Database Deletion in `wipeAllData` — LOW (New)
+
+**Location:** `src/main/store.ts:276-280`
+
+```typescript
+export function wipeAllData(): void {
+  db.exec('DELETE FROM messages');
+  db.exec('DELETE FROM conversations');
+  db.exec('DELETE FROM sso_configs');
+}
+```
+
+**Impact:** SQLite `DELETE FROM` marks pages as free but does not zero the underlying disk pages. Deleted conversation content, including messages that may contain CUI, remains physically on disk until the pages are reused by future writes. A forensic examination of the database file (or the underlying disk sectors) could recover deleted data.
+
+**CMMC Control:** MP.L2-3.8.3 — Sanitize or destroy information system media containing CUI before disposal or release for reuse.
+
+**Recommendation:** After deletion, run `PRAGMA secure_delete = ON` before the deletes, or follow up with `VACUUM` to rebuild the database file. For strongest guarantees, consider `PRAGMA secure_delete = ON` as a global database pragma set at init time.
 
 ---
 
@@ -374,21 +426,33 @@ The following security controls are correctly implemented:
 
 | Control | Implementation | Location |
 |---------|---------------|----------|
-| Process isolation | `contextIsolation: true`, `nodeIntegration: false` | `src/main/index.ts:22-23` |
-| IPC bridge pattern | `contextBridge.exposeInMainWorld()` with typed API | `src/preload/index.ts:129` |
+| Process isolation | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` | `src/main/index.ts:30-32` |
+| IPC bridge pattern | `contextBridge.exposeInMainWorld()` with typed API | `src/preload/index.ts:141` |
+| IPC request/response only | All handlers use `ipcMain.handle()`, no `ipcMain.on()` | `src/main/ipc-handlers.ts` |
 | SQL injection prevention | All queries use parameterized statements (`?` placeholders) | `src/main/store.ts` (all queries) |
-| Foreign key constraints | `PRAGMA foreign_keys = ON` with cascade deletes | `src/main/store.ts:12` |
-| WAL mode | `PRAGMA journal_mode = WAL` for database integrity | `src/main/store.ts:11` |
+| Foreign key constraints | `PRAGMA foreign_keys = ON` with cascade deletes | `src/main/store.ts:20` |
+| WAL mode | `PRAGMA journal_mode = WAL` for database integrity | `src/main/store.ts:19` |
 | Credential isolation | AWS credentials stored only in main process, never sent to renderer | `src/main/credential-manager.ts` |
-| SSO token isolation | `pendingWizardToken` held in main process module scope only | `src/main/ipc-handlers.ts:43` |
-| Navigation lockdown | External URLs opened in default browser, in-app navigation blocked | `src/main/index.ts:29-41` |
-| Window open handler | New windows denied, URLs redirected to external browser | `src/main/index.ts:29-32` |
+| Credential zeroization | `disconnect()` overwrites credential strings before clearing references | `src/main/credential-manager.ts:182-196` |
+| Session timeout | Configurable auto-disconnect with credential zeroization | `src/main/credential-manager.ts:204-219` |
+| SSO-only authentication | No manual AWS access key input; SSO or CLI profile only | IPC channels (no `AWS_CONNECT_KEYS`) |
+| SSO token isolation | `pendingWizardToken` held in main process module scope only | `src/main/ipc-handlers.ts:54` |
+| SSO token file permissions | Cache files `0o600`, directories `0o700` | `src/main/sso-auth.ts:193,206` |
+| Navigation lockdown | External URLs opened in default browser, in-app navigation blocked | `src/main/index.ts:37-49` |
+| Window open handler | New windows denied, URLs redirected to external browser | `src/main/index.ts:37-40` |
+| Content Security Policy | Strict CSP meta tag: `script-src 'self'`, `object-src 'none'` | `src/renderer/index.html:6-14` |
+| File access restriction | `readFile()` restricted to dialog-selected paths via `allowedPaths` set | `src/main/file-handler.ts:13,73` |
+| File size limit | 50 MB maximum enforced before reading | `src/main/file-handler.ts:65,81` |
+| Safe expression evaluation | `expr-eval` sandboxed parser, no `eval()`/`Function()` | `src/main/tool-executor.ts:8,12` |
+| XSS prevention | No `dangerouslySetInnerHTML`, no `innerHTML`, React auto-escaping | All renderer components |
+| Safe markdown rendering | `react-markdown` v9 does not render raw HTML (no `rehype-raw`) | `src/renderer/components/MarkdownRenderer.tsx` |
+| Source maps disabled in prod | `sourcemap: !isProduction` in Vite config | `vite.config.ts:18,35,58` |
 | TypeScript strict mode | `"strict": true` enforces type safety throughout | `tsconfig.json:8` |
 | ASAR packaging | Application code bundled in ASAR archive | `electron-builder.yml:11` |
-| Document name sanitization | Special characters stripped before Bedrock API calls | `src/main/bedrock-stream.ts:23-30` |
-| Markdown rendering | `react-markdown` v9 does not render raw HTML by default (no `rehype-raw`) | `src/renderer/components/MarkdownRenderer.tsx` |
-| Stream abort support | Active streams can be cancelled via `AbortController` | `src/main/bedrock-stream.ts:16,107` |
-| Token expiry validation | SSO tokens checked against expiration before use | `src/main/sso-auth.ts:100,141,157` |
+| Document name sanitization | Special characters stripped before Bedrock API calls | `src/main/bedrock-stream.ts:30-37` |
+| Stream abort support | Active streams can be cancelled via `AbortController` | `src/main/bedrock-stream.ts:23,125` |
+| Token expiry validation | SSO tokens checked against expiration before use | `src/main/sso-auth.ts:107,254,278` |
+| Secret file exclusion | `.gitignore` covers `.env`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `credentials.json` | `.gitignore:9-16` |
 
 ---
 
@@ -403,6 +467,7 @@ The following security controls are correctly implemented:
 | react-markdown | ^9.0.1 | Does NOT render raw HTML without `rehype-raw` plugin (safe). |
 | rehype-highlight | ^7.0.1 | Code syntax highlighting. Low risk. |
 | remark-gfm | ^4.0.0 | GitHub-flavored markdown tables/checkboxes. Low risk. |
+| expr-eval | ^2.0.2 | Sandboxed math parser. No prototype/global access. |
 | uuid | ^10.0.0 | Cryptographically random UUIDs. No concerns. |
 | zustand | ^5.0.0 | Client-side state management. No security surface. |
 
@@ -412,35 +477,41 @@ The following security controls are correctly implemented:
 
 ## Remediation Roadmap
 
-### Immediate (Pre-Deployment Blockers)
+### Completed (Pre-Deployment Blockers — All Clear)
 
-| # | Finding | Severity | Effort | Status |
-|---|---------|----------|--------|--------|
-| 1 | SI-F01 | Critical | 1-2 hours | ✅ **REMEDIATED** — Replaced `Function()` with `expr-eval` safe parser |
-| 2 | SC-F02 | Critical | 1 hour | ✅ **REMEDIATED** — File permissions set to `0o600`/`0o700`, `clientSecret` removed from cache |
-| 3 | AC-F01 | Critical | 15 min | ✅ **REMEDIATED** — `sandbox: true` enabled |
-| 4 | SC-F01 | High | 30 min | ✅ **REMEDIATED** — Strict CSP meta tag added to `index.html` |
-| 5 | AC-F03 | High | 1-2 hours | ✅ **REMEDIATED** — `readFile()` restricted to dialog-selected paths via `allowedPaths` set |
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | SI-F01 | Critical | ✅ **REMEDIATED** — Replaced `Function()` with `expr-eval` safe parser |
+| 2 | SC-F02 | Critical | ✅ **REMEDIATED** — File permissions set to `0o600`/`0o700`, `clientSecret` removed from cache |
+| 3 | AC-F01 | Critical | ✅ **REMEDIATED** — `sandbox: true` enabled |
+| 4 | SC-F01 | High | ✅ **REMEDIATED** — Strict CSP meta tag added to `index.html` |
+| 5 | AC-F03 | High | ✅ **REMEDIATED** — `readFile()` restricted to dialog-selected paths via `allowedPaths` set |
+| 6 | AC-F02 | High | ✅ **REMEDIATED** — Configurable session timeout with credential zeroization |
+| 7 | SI-F02 | High | ✅ **REMEDIATED** — Credential values overwritten before reference cleared |
+| 8 | SI-F03 | High | ✅ **REMEDIATED** — 50 MB file size limit enforced |
+| 9 | CM-F01 | Medium | ✅ **REMEDIATED** — Source maps disabled in production via Vite config |
+| 10 | CM-F03 | Medium | ✅ **REMEDIATED** — `.gitignore` updated with secret file patterns |
+| 11 | IA-F01 | Medium | ✅ **REMEDIATED** — Manual key entry removed; SSO-only authentication |
 
 ### Short-Term (Next Sprint)
 
 | # | Finding | Severity | Effort | Action |
 |---|---------|----------|--------|--------|
-| 6 | AC-F02 | High | 2-3 hours | ⬜ Add session inactivity timeout and credential expiry checks |
-| 7 | SI-F02 | High | 30 min | ✅ **REMEDIATED** — Credential values overwritten before reference cleared |
-| 8 | SI-F03 | High | 30 min | ✅ **REMEDIATED** — 50 MB file size limit enforced |
-| 9 | AU-F01 | Medium | 4-6 hours | ⬜ Implement structured audit logging |
-| 10 | SI-F04 | Medium | 2-3 hours | ⬜ Add IPC rate limiting |
+| 12 | SC-F04 | Medium | 1 hour | ✅ **REMEDIATED** — `safeOpenExternal()` validates URL schemes (HTTP/S only) |
+| 13 | AU-F01 | Medium | 4-6 hours | ⬜ Implement structured audit logging |
+| 14 | SI-F04 | Medium | 2-3 hours | ✅ **REMEDIATED** — Sliding-window rate limiter on 6 IPC handlers |
 
 ### Medium-Term (Before Production)
 
 | # | Finding | Severity | Effort | Action |
 |---|---------|----------|--------|--------|
-| 11 | CM-F01 | Medium | 15 min | Disable source maps in production builds |
-| 12 | CM-F02 | Medium | 2-4 hours | Configure code signing for macOS and Windows |
-| 13 | CM-F03 | Medium | 15 min | Update `.gitignore` with secret file patterns |
-| 14 | IA-F01 | Medium | 2-3 hours | Evaluate OS keychain for credential storage |
-| 15 | MP-F01 | Medium | 4-8 hours | Evaluate SQLCipher for database encryption (if CUI stored) |
+| 15 | CM-F02 | Medium | 2-4 hours | ⬜ Configure code signing for macOS and Windows |
+| 16 | MP-F01 | Medium | 4-8 hours | ⬜ Evaluate SQLCipher for database encryption (if CUI stored) |
+| 17 | SI-F06 | Low | 30 min | ⬜ Add `PRAGMA secure_delete = ON` or `VACUUM` after data wipe |
+| 18 | SI-F05 | Low | 30 min | ⬜ Clear SSO token caches on disconnect |
+| 19 | SC-F05 | Low | 15 min | ⬜ Add `blob:` to CSP `img-src` directive |
+| 20 | AC-F04 | Low | 15 min | ⬜ Add permission request deny-all handler |
+| 21 | SC-F03 | Low | 30 min | ⬜ Explicit TLS 1.2+ enforcement on SDK clients |
 
 ---
 
@@ -448,13 +519,13 @@ The following security controls are correctly implemented:
 
 | CMMC Domain | Controls Assessed | Findings | Status |
 |-------------|-------------------|----------|--------|
-| AC — Access Control | AC.L2-3.1.1, 3.1.2, 3.1.3, 3.1.10, 3.1.11 | 3 findings (2 remediated) | Partial — AC-F01 + AC-F03 fixed, AC-F02 open |
+| AC — Access Control | AC.L2-3.1.1, 3.1.2, 3.1.3, 3.1.10, 3.1.11 | 4 findings (3 remediated) | **Substantially complete** — AC-F04 (low) open |
 | AU — Audit & Accountability | AU.L2-3.3.1, 3.3.2 | 1 finding | Not Implemented |
-| CM — Configuration Management | CM.L2-3.4.1, 3.4.2, 3.4.6 | 3 findings | Partial |
-| IA — Identification & Auth | IA.L2-3.5.10 | 1 finding | Partial |
-| MP — Media Protection | MP.L2-3.8.9 | 1 finding | Depends on FDE |
-| SC — System & Comms Protection | SC.L2-3.13.1, 3.13.8, 3.13.16 | 3 findings (2 remediated) | Partial — SC-F01 + SC-F02 fixed, SC-F03 (low) open |
-| SI — System & Info Integrity | SI.L2-3.14.1, 3.14.2, 3.14.3, 3.14.6 | 4 findings (3 remediated) | Partial — SI-F01 + SI-F02 + SI-F03 fixed, SI-F04 open |
+| CM — Configuration Management | CM.L2-3.4.1, 3.4.2, 3.4.6 | 3 findings (2 remediated) | Partial — CM-F02 (code signing) open |
+| IA — Identification & Auth | IA.L2-3.5.10 | 1 finding (1 remediated) | **Complete** — Manual keys removed |
+| MP — Media Protection | MP.L2-3.8.3, 3.8.9 | 2 findings | Partial — depends on FDE + secure delete |
+| SC — System & Comms Protection | SC.L2-3.13.1, 3.13.8, 3.13.16 | 5 findings (3 remediated) | Partial — SC-F03 + SC-F05 (low) open |
+| SI — System & Info Integrity | SI.L2-3.14.1, 3.14.2, 3.14.3, 3.14.6 | 6 findings (4 remediated) | Partial — SI-F05 + SI-F06 (low) open |
 
 ---
 
@@ -462,15 +533,17 @@ The following security controls are correctly implemented:
 
 1. **Full-Disk Encryption** — Mandate BitLocker (Windows) or FileVault (macOS) on all endpoints. The SQLite database and SSO token cache contain sensitive data.
 
-2. **AWS GovCloud** — For CUI workloads, the application should connect to AWS GovCloud (US) regions only. The `constants.ts` file already includes GovCloud region constants (`us-gov-west-1`, `us-gov-east-1`). Consider restricting the region selector to GovCloud-only in CMMC deployments.
+2. **AWS GovCloud** — For CUI workloads, the application should connect to AWS GovCloud (US) regions only. The `constants.ts` file defaults to `us-gov-west-1`. Consider restricting the region selector to GovCloud-only in CMMC deployments via admin-config.
 
-3. **Network Segmentation** — The application only makes outbound HTTPS connections to AWS service endpoints. No inbound connections are accepted. Firewall rules should allow only `*.amazonaws.com` and `*.aws` destinations.
+3. **Session Duration** — The default 60-minute session timeout is configurable via `admin-config.json`. IT administrators should set this based on organizational policy (NIST recommends 15 minutes for inactivity, 8 hours for maximum session). The current implementation is a maximum session timer; combine with OS-level screen lock for inactivity protection.
 
-4. **MDM Deployment (Intune)** — Code signing (CM-F02) is a prerequisite for Intune deployment. The NSIS installer for Windows and PKG for macOS should be signed before upload.
+4. **Network Segmentation** — The application only makes outbound HTTPS connections to AWS service endpoints. No inbound connections are accepted. Firewall rules should allow only `*.amazonaws.com` and `*.aws` destinations.
 
-5. **Auto-Update** — No auto-update mechanism is currently implemented. For CMMC, updates should be pushed through the MDM solution rather than self-updating, allowing IT to validate each release.
+5. **MDM Deployment (Intune)** — Code signing (CM-F02) is a prerequisite for Intune deployment. The NSIS installer for Windows and PKG for macOS should be signed before upload.
 
-6. **Incident Response** — The lack of audit logging (AU-F01) must be addressed before deployment. Logs should be forwarded to the organization's SIEM for monitoring.
+6. **Auto-Update** — No auto-update mechanism is currently implemented. For CMMC, updates should be pushed through the MDM solution rather than self-updating, allowing IT to validate each release.
+
+7. **Incident Response** — The lack of audit logging (AU-F01) must be addressed before deployment. Logs should be forwarded to the organization's SIEM for monitoring.
 
 ---
 
@@ -485,3 +558,13 @@ The following security controls are correctly implemented:
 | 2026-02-09 | SI-F02 | High → Remediated | Credential values overwritten with empty strings before reference nullification in `disconnect()`. | `src/main/credential-manager.ts` |
 | 2026-02-09 | SI-F03 | High → Remediated | Added 50 MB file size limit via `fs.statSync()` check before reading. | `src/main/file-handler.ts` |
 | 2026-02-09 | AC-F03 | High → Remediated | File reads restricted to paths returned by `openFileDialog()` via `allowedPaths` set. | `src/main/file-handler.ts` |
+| 2026-02-10 | AC-F02 | High → Remediated | Configurable session timeout (`sessionDurationMinutes` in admin-config.json, default 60 min). Timer starts after connection, calls `disconnect()` (zeroizes credentials) on expiry, notifies renderer via `AWS_SESSION_EXPIRED` IPC channel. | `src/shared/types.ts`, `resources/admin-config.json`, `src/shared/ipc-channels.ts`, `src/main/admin-config.ts`, `src/main/credential-manager.ts`, `src/main/ipc-handlers.ts`, `src/preload/index.ts`, `src/renderer/lib/ipc-client.ts`, `src/renderer/hooks/useAutoConnect.ts` |
+| 2026-02-10 | CM-F01 | Medium → Remediated | Verified source maps are disabled in production builds via `sourcemap: !isProduction` in Vite config (all three build targets). | `vite.config.ts` (no change needed — already correct) |
+| 2026-02-10 | CM-F03 | Medium → Remediated | Verified `.gitignore` includes comprehensive secret patterns (`.env`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `credentials.json`). | `.gitignore` (no change needed — already correct) |
+| 2026-02-10 | IA-F01 | Medium → Remediated | Confirmed manual AWS key entry flow (`AWS_CONNECT_KEYS`, `connectWithKeys`) has been removed from codebase. SSO-only authentication enforced. | N/A (already removed) |
+| 2026-02-10 | SC-F04 | Medium → Remediated | Created `safeOpenExternal()` in `src/main/safe-open.ts` — validates URL scheme (HTTP/S only) before `shell.openExternal()`. Replaced all 4 call sites (2 in `index.ts`, 2 in `sso-auth.ts`). | `src/main/safe-open.ts` (new), `src/main/index.ts`, `src/main/sso-auth.ts` |
+| 2026-02-10 | SI-F04 | Medium → Remediated | Created sliding-window rate limiter (`src/main/ipc-rate-limiter.ts`). Added `checkRateLimit()` checks to 6 IPC handlers: `CHAT_SEND_MESSAGE` (10/10s), `TOOL_EXECUTE` (20/10s), `FILE_READ` (30/10s), `AWS_CONNECT_PROFILE` (3/30s), `SSO_CONNECT_WITH_CONFIG` (3/30s), `SSO_START_DEVICE_AUTH` (3/30s). | `src/main/ipc-rate-limiter.ts` (new), `src/main/ipc-handlers.ts` |
+| 2026-02-10 | SC-F05 | — | NEW finding: CSP `img-src` missing `blob:` directive needed by `FilePreview.tsx`. | — |
+| 2026-02-10 | SI-F05 | — | NEW finding: SSO token caches (`tokenCache`, `pendingWizardToken`) not cleared on disconnect. | — |
+| 2026-02-10 | SI-F06 | — | NEW finding: `wipeAllData()` uses `DELETE FROM` without secure deletion. | — |
+| 2026-02-10 | AC-F04 | — | NEW finding: No `setPermissionRequestHandler` configured on Electron session. | — |

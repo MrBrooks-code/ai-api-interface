@@ -18,8 +18,8 @@ import {
   ListAccountRolesCommand,
   GetRoleCredentialsCommand,
 } from '@aws-sdk/client-sso';
-import { shell } from 'electron';
 import { loadSharedConfigFiles } from '@smithy/shared-ini-file-loader';
+import { safeOpenExternal } from './safe-open';
 import { createHash } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -166,7 +166,7 @@ export async function performSsoLogin(
   onProgress({ stage: 'polling', verificationUri, userCode });
 
   // 3. Open browser
-  shell.openExternal(verificationUri);
+  safeOpenExternal(verificationUri);
 
   // 4. Poll for token
   const expiresAt = Date.now() + (authResp.expiresIn ?? 600) * 1000;
@@ -322,7 +322,7 @@ export async function performSsoDeviceAuth(
   const pollInterval = (authResp.interval ?? 5) * 1000;
 
   onProgress({ stage: 'polling', verificationUri, userCode });
-  shell.openExternal(verificationUri);
+  safeOpenExternal(verificationUri);
 
   const expiresAt = Date.now() + (authResp.expiresIn ?? 600) * 1000;
 

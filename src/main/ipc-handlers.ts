@@ -48,6 +48,7 @@ import {
   setSetting,
   wipeAllData,
 } from './store';
+import { checkRateLimit } from './ipc-rate-limiter';
 import type { SsoConfiguration } from '../shared/types';
 
 // Module-level token held securely in main process — never sent to renderer
@@ -62,6 +63,9 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC.AWS_CONNECT_PROFILE, async (event, profile: string, region: string) => {
+    if (!checkRateLimit('aws:connect', 3, 30_000)) {
+      return { success: false, error: 'Rate limit exceeded — please wait before retrying' };
+    }
     try {
       resetBedrockClient();
       const window = BrowserWindow.fromWebContents(event.sender);
@@ -131,6 +135,9 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC.SSO_START_DEVICE_AUTH, async (event, startUrl: string, region: string) => {
+    if (!checkRateLimit('sso:device-auth', 3, 30_000)) {
+      return { success: false, error: 'Rate limit exceeded — please wait before retrying' };
+    }
     try {
       const window = BrowserWindow.fromWebContents(event.sender);
       const result = await performSsoDeviceAuth(startUrl, region, (progress) => {
@@ -180,6 +187,9 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC.SSO_CONNECT_WITH_CONFIG, async (event, configId: string) => {
+    if (!checkRateLimit('sso:connect', 3, 30_000)) {
+      return { success: false, error: 'Rate limit exceeded — please wait before retrying' };
+    }
     try {
       const config = getSsoConfig(configId);
       if (!config) {
@@ -206,6 +216,9 @@ export function registerIpcHandlers() {
   // --- Chat / Streaming ---
 
   ipcMain.handle(IPC.CHAT_SEND_MESSAGE, async (event, params) => {
+    if (!checkRateLimit('chat:send', 10, 10_000)) {
+      return { requestId: '', error: 'Rate limit exceeded — please slow down' };
+    }
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!window) throw new Error('No window found');
     const requestId = await sendMessage(params, window);
@@ -219,6 +232,9 @@ export function registerIpcHandlers() {
   // --- Tool Execution ---
 
   ipcMain.handle(IPC.TOOL_EXECUTE, async (_event, name: string, input: Record<string, unknown>) => {
+    if (!checkRateLimit('tool:execute', 20, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
     return executeTool(name, input);
   });
 
@@ -229,6 +245,9 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC.FILE_READ, async (_event, filePath: string) => {
+    if (!checkRateLimit('file:read', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
     return readFile(filePath);
   });
 

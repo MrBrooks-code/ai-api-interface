@@ -5,10 +5,11 @@
  * built `dist/` directory in production.
  */
 
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
 import { initStore } from './store';
+import { safeOpenExternal } from './safe-open';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -35,7 +36,7 @@ function createWindow() {
 
   // Open external links in default browser instead of navigating Electron
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    safeOpenExternal(url);
     return { action: 'deny' };
   });
 
@@ -45,7 +46,7 @@ function createWindow() {
       return;
     }
     event.preventDefault();
-    shell.openExternal(url);
+    safeOpenExternal(url);
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {
