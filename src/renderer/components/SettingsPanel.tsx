@@ -11,14 +11,14 @@ import { useSettings } from '../hooks/useSettings';
 import { useChatStore } from '../stores/chat-store';
 import { ALL_REGIONS } from '../../shared/constants';
 import { ipc } from '../lib/ipc-client';
-import { applyThemeClass } from '../App';
+import { applyThemeClass, getCustomThemeConfig } from '../App';
 import type { ThemeId } from '../../shared/types';
 
 /** Top-level tab selection in the settings panel. */
 type TopTab = 'general' | 'connection';
 
-/** Available color themes mapped to user-facing labels. */
-const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
+/** Built-in color themes mapped to user-facing labels. */
+const BUILT_IN_THEME_OPTIONS: { id: ThemeId; label: string }[] = [
   { id: 'catppuccin-mocha', label: 'Midnight' },
   { id: 'catppuccin-latte', label: 'Cloud' },
   { id: 'nord', label: 'Arctic' },
@@ -54,6 +54,15 @@ export default function SettingsPanel() {
     deleteSsoConfig,
     connectWithSsoConfig,
   } = useSettings();
+
+  /** Theme options list — conditionally includes the admin custom theme. */
+  const themeOptions = useMemo(() => {
+    const custom = getCustomThemeConfig();
+    if (custom) {
+      return [...BUILT_IN_THEME_OPTIONS, { id: 'custom' as ThemeId, label: custom.name }];
+    }
+    return BUILT_IN_THEME_OPTIONS;
+  }, []);
 
   const [topTab, setTopTab] = useState<TopTab>('general');
   const [mode, setMode] = useState<'profile' | 'sso'>(
@@ -187,7 +196,7 @@ export default function SettingsPanel() {
                     onChange={(e) => handleThemeChange(e.target.value as ThemeId)}
                     className="w-full bg-surface rounded-lg px-3 py-2 text-sm text-text border border-surface-lighter focus:border-primary outline-none"
                   >
-                    {THEME_OPTIONS.map((t) => (
+                    {themeOptions.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.label}
                       </option>

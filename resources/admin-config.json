@@ -1,8 +1,30 @@
 {
   "loginBanner": {
-    "title": "Bedrock AI",
-    "message": "Welcome to Bedrock! Please sign in to continue.",
+    "title": "",
+    "message": "This is a private system. Unauthorized access is prohibited. All activities are monitored and logged.",
     "titlebar": "Bedrock AI"
   },
-  "sessionDurationMinutes": 60
+  "sessionDurationMinutes": 60,
+  "customTheme": {
+    "name": "Corporate Light",
+    "baseTheme": "catppuccin-latte",
+    "logoPath": "branding.png",
+    "colors": {
+      "primary": "#003f87",
+      "primaryHover": "#00529e",
+      "surface": "#f5f8fc",
+      "surfaceLight": "#eaf0f7",
+      "surfaceLighter": "#d6e1ee",
+      "text": "#003060",
+      "textMuted": "#4a6d8c",
+      "textDim": "#7a9ab8",
+      "accentGreen": "#4ea832",
+      "accentRed": "#d93025",
+      "accentYellow": "#a0c814",
+      "accentPeach": "#00bcd4",
+      "codeBg": "#e4ecf4",
+      "scrollbarThumb": "#b8cce0",
+      "scrollbarThumbHover": "#90aac8"
+    }
+  }
 }

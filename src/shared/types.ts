@@ -190,12 +190,14 @@ export interface AdminConfig {
   loginBanner: LoginBanner;
   /** Maximum session duration in minutes before auto-disconnect. Default: 60. */
   sessionDurationMinutes: number;
+  /** Optional corporate theme defined by IT admins. */
+  customTheme?: CustomThemeConfig;
 }
 
 // --- App Settings ---
 
-/** Identifier for the active color theme. Each maps to a CSS class in `styles.css`. */
-export type ThemeId =
+/** Identifier for a built-in color theme that maps to a CSS class in `styles.css`. */
+export type BuiltInThemeId =
   | 'catppuccin-mocha'
   | 'catppuccin-latte'
   | 'nord'
@@ -203,6 +205,42 @@ export type ThemeId =
   | 'rose-pine'
   | 'gruvbox-dark'
   | 'solarized-light';
+
+/** Identifier for the active color theme, including an optional admin-defined custom theme. */
+export type ThemeId = BuiltInThemeId | 'custom';
+
+/** All CSS color properties that a theme can define (camelCase keys). */
+export interface ThemeColors {
+  surface?: string;
+  surfaceLight?: string;
+  surfaceLighter?: string;
+  primary?: string;
+  primaryHover?: string;
+  text?: string;
+  textMuted?: string;
+  textDim?: string;
+  accentGreen?: string;
+  accentRed?: string;
+  accentYellow?: string;
+  accentPeach?: string;
+  codeBg?: string;
+  scrollbarThumb?: string;
+  scrollbarThumbHover?: string;
+}
+
+/** IT-managed custom theme configuration from `admin-config.json`. */
+export interface CustomThemeConfig {
+  /** Display name shown in the theme dropdown (e.g. "Acme Corp"). */
+  name: string;
+  /** Built-in theme to inherit unspecified colors from. Defaults to `catppuccin-mocha`. */
+  baseTheme?: BuiltInThemeId;
+  /** Path to a logo image relative to the `resources/` directory. */
+  logoPath?: string;
+  /** Base64 data URI of the logo, populated at runtime by the main process. */
+  logo?: string;
+  /** Color overrides — only specified keys are applied; the rest inherit from `baseTheme`. */
+  colors?: ThemeColors;
+}
 
 /** User-facing application settings persisted to the local database. */
 export interface AppSettings {
