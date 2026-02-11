@@ -2,7 +2,9 @@
 
 A secure, cross-platform desktop application for conversational AI powered by Amazon Bedrock. Built for organizations that require credential isolation, SSO integration, and compliance-ready configuration — including AWS GovCloud support.
 
-![Bedrock Chat — welcome screen with sidebar and logon banner](assets/image.png)
+<p align="center">
+  <img src="assets/image.png" alt="Bedrock Chat — welcome screen with sidebar and logon banner" />
+</p>
 
 ## Overview
 
@@ -28,7 +30,9 @@ The application follows a strict security architecture: AWS credentials are reso
 - **GovCloud and commercial region support** across 12 AWS regions
 - **Cross-platform packaging** for macOS (DMG) and Windows (NSIS installer)
 
-![Bedrock Chat — markdown rendering with code blocks, tables, and task lists](assets/image2.png)
+<p align="center">
+  <img src="assets/image2.png" alt="Bedrock Chat — markdown rendering with code blocks, tables, and task lists" />
+</p>
 
 ## Architecture
 
