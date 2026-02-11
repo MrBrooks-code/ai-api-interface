@@ -3,8 +3,9 @@
  * support, and send/stop streaming controls.
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import FilePreview from './FilePreview';
+import { useChatStore } from '../stores/chat-store';
 import { ipc } from '../lib/ipc-client';
 import type { UploadedFile } from '../../shared/types';
 
@@ -21,6 +22,19 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
   const [text, setText] = useState('');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const activeConversationId = useChatStore((s) => s.activeConversationId);
+
+  /** Focus the textarea whenever the active conversation changes (including new chat). */
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, [activeConversationId]);
+
+  /** Focus the textarea when the input becomes enabled (e.g. after connecting to AWS). */
+  useEffect(() => {
+    if (!disabled) {
+      textareaRef.current?.focus();
+    }
+  }, [disabled]);
 
   const handleSubmit = useCallback(() => {
     if (isStreaming) {

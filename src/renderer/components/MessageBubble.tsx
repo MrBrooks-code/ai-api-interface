@@ -109,22 +109,6 @@ export default function MessageBubble({ message, isStreaming }: Props) {
 
   return (
     <div className={`group/msg relative flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {/* Hover action bar — assistant messages only */}
-      {!isUser && (
-        <div
-          className="absolute -top-8 left-0 z-10 flex items-center gap-1 px-2 py-1
-            bg-surface-lighter rounded-lg shadow-sm
-            opacity-0 group-hover/msg:opacity-100 transition-opacity"
-        >
-          <button
-            onClick={handleCopyMessage}
-            className="text-xs text-text-muted hover:text-text px-1.5 py-0.5 rounded hover:bg-surface-light transition-colors"
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
-      )}
-
       <div
         className={`rounded-2xl px-4 py-3 overflow-hidden ${
           isUser
@@ -140,10 +124,20 @@ export default function MessageBubble({ message, isStreaming }: Props) {
           <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
         )}
 
-        {/* Message timestamp */}
-        <span className="text-[10px] text-text-dim mt-1 block">
-          {formatTime(message.timestamp)}
-        </span>
+        {/* Timestamp and copy action */}
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-[10px] text-text-dim">
+            {formatTime(message.timestamp)}
+          </span>
+          {!isUser && (
+            <button
+              onClick={handleCopyMessage}
+              className="text-[10px] text-text-dim opacity-0 group-hover/msg:opacity-60 hover:!opacity-100 transition-opacity ml-3"
+            >
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

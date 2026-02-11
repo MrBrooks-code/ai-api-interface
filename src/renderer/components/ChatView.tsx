@@ -101,7 +101,7 @@ export default function ChatView() {
         onSend={sendMessage}
         onAbort={abortStream}
         isStreaming={isStreaming}
-        disabled={!connectionStatus.connected}
+        disabled={!connectionStatus.connected || autoConnecting}
       />
     </div>
   );
