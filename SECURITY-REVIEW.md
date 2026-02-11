@@ -119,12 +119,17 @@ webPreferences: {
 
 #### AC-F04: No Electron Permission Request Handler — ~~LOW~~ REMEDIATED ✅
 
-**Location:** `src/main/index.ts:37-39`
-**Remediated:** 2026-02-10
+**Location:** `src/main/index.ts:37-44`
+**Remediated:** 2026-02-10 (updated 2026-02-10)
 
 **CMMC Control:** AC.L2-3.1.1 — Limit system access to authorized users, processes acting on behalf of authorized users, and devices.
 
-**Fix applied:** Added a blanket deny-all `setPermissionRequestHandler` on `session.defaultSession` inside `createWindow()`. All Chromium permission requests (camera, microphone, geolocation, notifications, etc.) are now rejected. The application does not use any of these APIs, so there is no functional impact.
+**Fix applied:** Added least-privilege permission handlers on `session.defaultSession` inside `createWindow()`:
+
+1. `setPermissionRequestHandler` — denies all Chromium permission requests (camera, microphone, geolocation, notifications, etc.) **except** `openExternal`, which is required for SSO device-authorization browser popups.
+2. `setPermissionCheckHandler` — the synchronous permission check counterpart used by Electron 33 for `shell.openExternal()`. Same policy: allows only `openExternal`, denies all others.
+
+The initial deny-all implementation inadvertently blocked `shell.openExternal()`, preventing the SSO authorization browser popup from opening during device-auth flows. The `openExternal` exception follows the principle of least privilege — it is the only permission the application requires.
 
 **Files modified:** `src/main/index.ts`
 
@@ -295,7 +300,9 @@ This guarantees TLS 1.2 as the floor regardless of the Node.js or OS default, pr
 **Locations:** `src/main/index.ts`, `src/main/sso-auth.ts`
 **Remediated:** 2026-02-10
 
-**Fix applied:** Created `src/main/safe-open.ts` with a `safeOpenExternal()` function that parses URLs and validates the scheme against an allowlist (`https:` and `http:` only). Malformed or non-HTTP(S) URLs are silently blocked and logged. All four `shell.openExternal()` call sites (2 in `index.ts`, 2 in `sso-auth.ts`) now use `safeOpenExternal()` instead.
+**Fix applied:** Created `src/main/safe-open.ts` with a `safeOpenExternal()` function that parses URLs and validates the scheme against an allowlist (`https:` and `http:` only). Malformed or non-HTTP(S) URLs are blocked and logged. All four `shell.openExternal()` call sites (2 in `index.ts`, 2 in `sso-auth.ts`) now use `safeOpenExternal()` instead.
+
+If `shell.openExternal()` fails (e.g. due to Electron session permission restrictions), the function falls back to the native OS open command via `execFile` (`open` on macOS, `xdg-open` on Linux, `cmd /c start` on Windows). `execFile` (not `exec`) is used so the URL is passed as an argv element rather than interpolated into a shell string — no command injection risk. The URL has already been validated as HTTP(S) before reaching this fallback.
 
 **Files modified:** `src/main/safe-open.ts` (new), `src/main/index.ts`, `src/main/sso-auth.ts`
 
@@ -489,7 +496,7 @@ The following security controls are correctly implemented:
 | SSO token isolation | `pendingWizardToken` held in main process module scope only | `src/main/ipc-handlers.ts:55` |
 | SSO token zeroization | `clearTokenCache()` and `clearPendingWizardToken()` overwrite tokens on disconnect | `src/main/sso-auth.ts:253-263`, `src/main/ipc-handlers.ts:57-62` |
 | SSO token file permissions | Cache files `0o600`, directories `0o700` | `src/main/sso-auth.ts:193,206` |
-| Permission deny-all | `setPermissionRequestHandler` rejects all Chromium permission requests | `src/main/index.ts:37-39` |
+| Permission least-privilege | `setPermissionRequestHandler` + `setPermissionCheckHandler` deny all permissions except `openExternal` (required for SSO browser auth) | `src/main/index.ts:37-44` |
 | Navigation lockdown | External URLs opened in default browser, in-app navigation blocked | `src/main/index.ts:42-55` |
 | Window open handler | New windows denied, URLs redirected to external browser | `src/main/index.ts:37-40` |
 | Content Security Policy | Strict CSP meta tag: `script-src 'self'`, `img-src 'self' data: blob:`, `object-src 'none'` | `src/renderer/index.html:6-14` |
@@ -571,7 +578,7 @@ The following security controls are correctly implemented:
 | 20 | SI-F06 | Low | 30 min | ✅ **REMEDIATED** — `PRAGMA secure_delete = ON` at init + `VACUUM` after wipe |
 | 21 | SI-F05 | Low | 30 min | ✅ **REMEDIATED** — `clearTokenCache()` + `clearPendingWizardToken()` on disconnect |
 | 22 | SC-F05 | Low | 15 min | ✅ **REMEDIATED** — Added `blob:` to CSP `img-src` directive |
-| 23 | AC-F04 | Low | 15 min | ✅ **REMEDIATED** — Deny-all `setPermissionRequestHandler` on default session |
+| 23 | AC-F04 | Low | 15 min | ✅ **REMEDIATED** — Least-privilege permission handlers (`openExternal` only) on default session |
 | 24 | SC-F03 | Low | 30 min | ✅ **REMEDIATED** — `NodeHttpHandler` with `minVersion: 'TLSv1.2'` on all SDK clients |
 | 25 | SI-F08 | Low | — | Accepted Risk — Document third-party data flow in SSP |
 
@@ -640,3 +647,5 @@ The following security controls are correctly implemented:
 | 2026-02-10 | SI-F06 | Low → Remediated | Added `PRAGMA secure_delete = ON` at database init (zeros freed pages on every DELETE). Added `VACUUM` at end of `wipeAllData()` to rebuild the database file and eliminate free-list residue. | `src/main/store.ts` |
 | 2026-02-10 | AC-F04 | Low → Remediated | Added `session.defaultSession.setPermissionRequestHandler()` that denies all Chromium permission requests (camera, mic, geolocation, notifications, etc.) in `createWindow()`. | `src/main/index.ts` |
 | 2026-02-10 | SC-F05 | Low → Remediated | Added `blob:` to CSP `img-src` directive for `FilePreview.tsx` blob URL support. | `src/renderer/index.html` |
+| 2026-02-10 | AC-F04 | Remediated (updated) | Refined deny-all permission handler to allow `openExternal` (least privilege). Added `setPermissionCheckHandler` (Electron 33 sync counterpart). The initial deny-all blocked `shell.openExternal()`, preventing SSO browser popups. | `src/main/index.ts` |
+| 2026-02-10 | SC-F04 | Remediated (updated) | Added native OS fallback (`execFile open/xdg-open/cmd`) in `safeOpenExternal()` if `shell.openExternal()` is blocked by session permissions. Uses `execFile` (not `exec`) to prevent command injection. | `src/main/safe-open.ts` |
