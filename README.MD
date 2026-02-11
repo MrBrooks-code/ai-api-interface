@@ -179,6 +179,40 @@ IT administrators can customize the application by editing `resources/admin-conf
 | `loginBanner.titlebar` | Text displayed in the application title bar |
 | `sessionDurationMinutes` | Auto-disconnect timeout in minutes (default: 60). Credentials are zeroized on expiry. |
 
+### Custom Theme
+
+Administrators can define a corporate-branded theme by adding a `customTheme` section to `admin-config.json`. The custom theme appears alongside the 7 built-in themes in the Settings dropdown.
+
+```json
+{
+  "loginBanner": { "..." : "..." },
+  "sessionDurationMinutes": 60,
+  "customTheme": {
+    "name": "Corporate Light",
+    "baseTheme": "catppuccin-latte",
+    "logoPath": "branding.png",
+    "colors": {
+      "primary": "#003f87",
+      "primaryHover": "#00529e",
+      "surface": "#f5f8fc",
+      "surfaceLight": "#eaf0f7",
+      "surfaceLighter": "#d6e1ee"
+    }
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Display name shown in the theme dropdown (e.g. "Acme Corp") |
+| `baseTheme` | No | Built-in theme to inherit unspecified colors from. Default: `catppuccin-mocha` |
+| `logoPath` | No | Path to a logo image relative to the `resources/` directory. Must be ≤ 1 MB. Displayed on the welcome screen. |
+| `colors` | No | Color overrides — only specify the keys you want to change. Unspecified colors inherit from `baseTheme`. |
+
+**Available color keys:** `surface`, `surfaceLight`, `surfaceLighter`, `primary`, `primaryHover`, `text`, `textMuted`, `textDim`, `accentGreen`, `accentRed`, `accentYellow`, `accentPeach`, `codeBg`, `scrollbarThumb`, `scrollbarThumbHover`
+
+All color values must be hex format (`#rgb` or `#rrggbb`). Invalid values are silently ignored. If `customTheme` is omitted or `name` is missing, no custom theme is added and the app behaves as before.
+
 This file is bundled into the packaged application via `extraResources` and can be replaced post-install or deployed alongside the binary via MDM (Intune, Jamf, etc.). If the file is missing or malformed, the application falls back to defaults.
 
 ## Security
