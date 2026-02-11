@@ -24,9 +24,6 @@ Bedrock Chat provides a native desktop interface to Amazon Bedrock's Converse AP
 - **GovCloud and commercial region support** across 12 AWS regions
 - **Cross-platform packaging** for macOS (DMG) and Windows (NSIS installer)
 
-<p align="center">
-  <img src="assets/image2.png" alt="Bedrock Chat — markdown rendering with code blocks, tables, and task lists" />
-</p>
 
 ## Architecture
 
