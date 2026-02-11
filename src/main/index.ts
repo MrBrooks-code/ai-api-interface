@@ -34,9 +34,14 @@ function createWindow() {
     },
   });
 
-  // Deny all renderer permission requests (camera, mic, geolocation, etc.)
-  session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
-    callback(false);
+  // Deny renderer permission requests except openExternal (needed for SSO browser auth).
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'openExternal');
+  });
+
+  // Synchronous permission check — Electron 33 routes shell.openExternal through this handler.
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+    return permission === 'openExternal';
   });
 
   // Open external links in default browser instead of navigating Electron
