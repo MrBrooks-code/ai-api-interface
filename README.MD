@@ -1,6 +1,6 @@
 # Bedrock Chat
 
-A secure, cross-platform desktop application for conversational AI powered by Amazon Bedrock. Built for organizations that require credential isolation, SSO integration, and compliance-ready configuration — including AWS GovCloud support.
+A secure, cross-platform desktop application for conversational AI powered by Amazon Bedrock. Built for organizations that require compliance-ready configuration for Amazon Bedrock — including AWS GovCloud support.
 
 <p align="center">
   <img src="assets/image.png" alt="Bedrock Chat — welcome screen with sidebar and logon banner" />
@@ -8,24 +8,18 @@ A secure, cross-platform desktop application for conversational AI powered by Am
 
 ## Overview
 
-Bedrock Chat provides a native desktop interface to Amazon Bedrock's Converse API with real-time streaming, conversation persistence, file uploads, web search, and built-in tool use. It is designed for environments where browser-based AI tools are restricted or where tighter control over credential handling and data residency is required.
+Bedrock Chat provides a native desktop interface to Amazon Bedrock's Converse API with real-time streaming, conversation persistence, file uploads, web search, and built-in tool use. It is designed for environments where browser-based AI tools are restricted or where tighter control of client is required.
 
-The application follows a strict security architecture: AWS credentials are resolved and held exclusively in the Electron main process and never cross into the renderer. The renderer runs fully sandboxed with context isolation enabled, communicating only through a typed IPC bridge.
 
 ## Features
 
-- **Streaming chat** with token-by-token response rendering via the Bedrock Converse API
-- **Web search and page reading** — the assistant can search DuckDuckGo and read webpage content in real time, with full SSRF protection
-- **Grouped tool activity UI** — intermediate tool calls and results are displayed in a collapsible panel, keeping the conversation clean
+- **Streaming chat** with response rendering via the Bedrock Converse API
+- **Web Search and Website Reading** — the assistant can search DuckDuckGo and read webpage content in real time, with full SSRF protection
 - **AWS SSO integration** with device authorization flow, account/role discovery, and token caching
-- **AWS Profile support** for `~/.aws/config` and `~/.aws/credentials` (both SSO and static profiles)
 - **Conversation persistence** in a local SQLite database with full-text search
 - **File uploads** for images (PNG, JPEG, GIF, WebP) and documents (PDF, CSV, DOC/DOCX, XLS/XLSX, HTML, TXT, Markdown)
 - **Rich markdown rendering** with syntax-highlighted code blocks, tables, blockquotes, task lists, and copy-to-clipboard
-- **Resizable sidebar** with conversation search and keyboard-accessible navigation
-- **7 color themes** with instant switching and persistence
-- **Configurable session timeout** with automatic credential cleanup on expiry
-- **Admin-configurable logon banner and titlebar** for compliance messaging (CMMC AC.L2-3.1.9)
+- **7 color themes** with instant switching, persistence, and custom theme configuration
 - **Model selection** from available inference profiles or custom model IDs
 - **GovCloud and commercial region support** across 12 AWS regions
 - **Cross-platform packaging** for macOS (DMG) and Windows (NSIS installer)
@@ -53,14 +47,12 @@ The application follows a strict security architecture: AWS credentials are reso
 |                                                          |
 +------------ contextBridge (preload) ---------------------+
 |                                                          |
-|                 Renderer Process (React)                  |
+|                 Renderer Process (React)                 |
 |  Components, Zustand store, IPC client wrapper           |
 |  contextIsolation: true | nodeIntegration: false         |
 |  sandbox: true                                           |
 +---------------------------------------------------------+
 ```
-
-Credentials flow **inward only** — the renderer sends connection requests to the main process, which resolves and stores credentials internally. Credentials never flow back to the renderer. Chat messages are streamed from Bedrock through the main process to the renderer via `webContents.send()`.
 
 ## Getting Started
 
@@ -90,7 +82,7 @@ This starts the Vite dev server with Electron hot reload. The application will l
 
 ## Built-in Tools
 
-The assistant can invoke these tools automatically during conversation. Tool calls and results are displayed in a collapsible activity panel in the chat.
+The assistant can invoke these tools automatically during conversation. Tool calls and results are displayed in a collapsible activity panel in the chat. 
 
 **Web Search** — Searches DuckDuckGo for real-time information. Returns structured results with titles, URLs, and snippets. Configurable result count (1-10).
 
@@ -140,20 +132,6 @@ compliance/
 +-- CODE-REVIEW.md           # Codebase review findings and fix tracking
 ```
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Desktop framework | Electron 33 |
-| UI | React 18, Tailwind CSS 3.4 |
-| State management | Zustand 5 |
-| Build tooling | Vite 6, TypeScript 5.7 |
-| Database | better-sqlite3 (SQLite with WAL mode, secure delete) |
-| AWS SDK | @aws-sdk v3 (Bedrock, SSO, SSO-OIDC, credential providers) |
-| Markdown | react-markdown 9, remark-gfm, rehype-highlight |
-| Math parser | expr-eval (sandboxed expression evaluator) |
-| Packaging | electron-builder 25 |
-
 ## Themes
 
 Seven built-in themes are available under Settings > Appearance:
@@ -176,7 +154,7 @@ Theme selection persists across sessions.
 
 **Commercial:** `us-east-1`, `us-east-2`, `us-west-2`, `eu-west-1`, `eu-west-2`, `eu-west-3`, `eu-central-1`, `ap-southeast-1`, `ap-southeast-2`, `ap-northeast-1`
 
-The default model is Claude Sonnet 4.5 — GovCloud uses `us-gov.anthropic.claude-sonnet-4-5-20250929-v1:0`, commercial uses the `us.` prefix equivalent.
+The default model is Claude Sonnet 4.5 
 
 ## Admin Configuration
 
@@ -204,7 +182,7 @@ This file is bundled into the packaged application via `extraResources` and can 
 
 ## Security
 
-The application has undergone a comprehensive security review against CMMC Level 2 (NIST SP 800-171) controls. All critical and high severity findings have been remediated.
+The application has undergone a comprehensive security review against CMMC Level 2 (NIST SP 800-171) controls. 
 
 | Property | Implementation |
 |----------|---------------|
