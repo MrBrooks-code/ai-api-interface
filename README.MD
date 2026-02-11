@@ -27,29 +27,33 @@ Bedrock Chat provides a native desktop interface to Amazon Bedrock's Converse AP
 
 ## Architecture
 
+<div align="center">
+<pre>
 ```
-          +---------------------------------------------------------+
-          |                  Electron Main Process                   |
-          |                                                          |
-          |  credential-manager -- AWS credential resolution         |
-          |  sso-auth ------------ Device auth flow + token cache    |
-          |  bedrock-client ------ AWS SDK client instances          |
-          |  bedrock-stream ------ Converse API streaming            |
-          |  store --------------- SQLite via better-sqlite3         |
-          |  tool-executor ------- Safe tool execution               |
-          |  web-search ---------- DuckDuckGo + webpage reader       |
-          |  file-handler -------- Dialog + validated file reads     |
-          |  ipc-rate-limiter ---- Per-channel request throttling    |
-          |  admin-config -------- IT-managed configuration          |
-          |                                                          |
-          +------------ contextBridge (preload) ---------------------+
-          |                                                          |
-          |                 Renderer Process (React)                 |
-          |  Components, Zustand store, IPC client wrapper           |
-          |  contextIsolation: true | nodeIntegration: false         |
-          |  sandbox: true                                           |
-          +---------------------------------------------------------+
++---------------------------------------------------------+
+|                  Electron Main Process                   |
+|                                                          |
+|  credential-manager -- AWS credential resolution         |
+|  sso-auth ------------ Device auth flow + token cache    |
+|  bedrock-client ------ AWS SDK client instances          |
+|  bedrock-stream ------ Converse API streaming            |
+|  store --------------- SQLite via better-sqlite3         |
+|  tool-executor ------- Safe tool execution               |
+|  web-search ---------- DuckDuckGo + webpage reader       |
+|  file-handler -------- Dialog + validated file reads     |
+|  ipc-rate-limiter ---- Per-channel request throttling    |
+|  admin-config -------- IT-managed configuration          |
+|                                                          |
++------------ contextBridge (preload) ---------------------+
+|                                                          |
+|                 Renderer Process (React)                 |
+|  Components, Zustand store, IPC client wrapper           |
+|  contextIsolation: true | nodeIntegration: false         |
+|  sandbox: true                                           |
++---------------------------------------------------------+
 ```
+</pre>
+</div>
 
 ## Getting Started
 
