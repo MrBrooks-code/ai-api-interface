@@ -3,7 +3,7 @@
 **Application:** Bedrock Chat v1.0.0
 **Date:** 2026-02-10
 **Scope:** All 14 CMMC Level 2 (NIST SP 800-171) domains
-**Companion Document:** [`SECURITY-REVIEW.MD`](./SECURITY-REVIEW.MD)
+**Companion Document:** [`SECURITY-REVIEW.md`](./SECURITY-REVIEW.md)
 
 ---
 

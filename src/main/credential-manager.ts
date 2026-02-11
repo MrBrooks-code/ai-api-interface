@@ -177,7 +177,7 @@ export function isConnected(): boolean {
 /**
  * Clears the active session. Credential values are overwritten with empty
  * strings before the reference is released (best-effort zeroization for
- * defense-in-depth — see SI-F02 in SECURITY-REVIEW.MD).
+ * defense-in-depth — see SI-F02 in compliance/SECURITY-REVIEW.md).
  */
 export function disconnect(): void {
   clearSessionTimer();
