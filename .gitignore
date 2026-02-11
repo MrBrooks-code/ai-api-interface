@@ -1,9 +1,10 @@
-node_modules/
+# Build output
 dist/
 dist-electron/
 release/
-*.log
-.DS_Store
+
+# Dependencies
+node_modules/
 
 # Secrets and credentials
 .env
@@ -14,3 +15,10 @@ release/
 *.pfx
 *.cert
 credentials.json
+
+# Branding assets
+resources/branding.png
+
+# OS / editor
+.DS_Store
+*.log
