@@ -15,7 +15,6 @@ export const IPC = {
   AWS_CONNECTION_STATUS: 'aws:connection-status',
   AWS_LIST_MODELS: 'aws:list-models',
   AWS_SET_MODEL: 'aws:set-model',
-  AWS_SSO_LOGIN: 'aws:sso-login',
   AWS_SSO_STATUS: 'aws:sso-status',
   AWS_SESSION_EXPIRED: 'aws:session-expired',
 

@@ -74,9 +74,13 @@ export default function MessageBubble({ message, isStreaming }: Props) {
       .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
       .map((b) => b.text)
       .join('\n');
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard write can fail if the window isn't focused
+    }
   };
 
   // Don't show messages that only contain tool results (they're displayed inline)

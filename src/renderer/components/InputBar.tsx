@@ -97,7 +97,8 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
             onClick={handleAttach}
             disabled={disabled}
             className="p-1.5 text-text-muted hover:text-text transition-colors disabled:opacity-30"
-            title="Attach file&#10;&#10;Supported types:&#10;Images: PNG, JPG, GIF, WEBP&#10;Documents: PDF, CSV, TXT, MD, HTML, DOC, DOCX, XLS, XLSX"
+            title="Attach file (PNG, JPG, GIF, WEBP, PDF, CSV, TXT, MD, HTML, DOC, DOCX, XLS, XLSX)"
+            aria-label="Attach file"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
@@ -112,6 +113,7 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
             onKeyDown={handleKeyDown}
             disabled={disabled}
             placeholder={disabled ? 'Connect to AWS to start chatting...' : 'Type a message...'}
+            aria-label="Message input"
             className="flex-1 bg-transparent resize-none outline-none text-text placeholder-text-dim text-sm leading-relaxed max-h-[200px] py-1.5"
             rows={1}
           />

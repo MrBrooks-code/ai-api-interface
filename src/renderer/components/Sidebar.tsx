@@ -102,9 +102,10 @@ export default function Sidebar() {
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto px-2 py-1">
         {displayedConversations.map((convo) => (
-          <div
+          <button
             key={convo.id}
-            className={`group flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors ${
+            type="button"
+            className={`group flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors w-full text-left ${
               convo.id === activeConversationId
                 ? 'bg-surface-lighter text-text'
                 : 'text-text-muted hover:bg-primary/10 hover:text-text'
@@ -112,16 +113,24 @@ export default function Sidebar() {
             onClick={() => loadMessages(convo.id)}
           >
             <span className="flex-1 truncate text-sm">{convo.title}</span>
-            <button
+            <span
+              role="button"
+              tabIndex={0}
               onClick={(e) => {
                 e.stopPropagation();
                 deleteConversation(convo.id);
               }}
-              className="opacity-0 group-hover:opacity-100 text-text-dim hover:text-accent-red transition-opacity text-xs px-1"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                  deleteConversation(convo.id);
+                }
+              }}
+              className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-text-dim hover:text-accent-red transition-opacity text-xs px-1"
             >
               ✕
-            </button>
-          </div>
+            </span>
+          </button>
         ))}
 
         {conversations.length === 0 && (

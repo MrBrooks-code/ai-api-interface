@@ -3,7 +3,7 @@
  * or renders an inline image from a message's {@link ImageBlock}.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { ImageBlock, UploadedFile } from '../../shared/types';
 
 /** Props for previewing an attached file before sending. */
@@ -34,12 +34,16 @@ export default function FilePreview(props: Props) {
 }
 
 function FilePreviewFromFile({ file, onRemove }: FileProps) {
-  const preview = useMemo(() => {
+  const [preview, setPreview] = useState<string | null>(null);
+
+  useEffect(() => {
     if (file.type === 'image') {
       const blob = new Blob([new Uint8Array(file.bytes)], { type: `image/${file.format}` });
-      return URL.createObjectURL(blob);
+      const url = URL.createObjectURL(blob);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
     }
-    return null;
+    setPreview(null);
   }, [file]);
 
   return (
@@ -67,9 +71,13 @@ function FilePreviewFromFile({ file, onRemove }: FileProps) {
 }
 
 function ImagePreviewFromBlock({ block }: BlockProps) {
-  const src = useMemo(() => {
+  const [src, setSrc] = useState('');
+
+  useEffect(() => {
     const blob = new Blob([new Uint8Array(block.bytes)], { type: `image/${block.format}` });
-    return URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
   }, [block]);
 
   return (

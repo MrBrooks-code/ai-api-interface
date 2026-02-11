@@ -12,6 +12,11 @@ import type { UploadedFile } from '../shared/types';
 /** Tracks file paths the user has explicitly selected via the open dialog. */
 const allowedPaths = new Set<string>();
 
+/** Clears all file-access grants. Called on disconnect/session expiry. */
+export function clearAllowedPaths(): void {
+  allowedPaths.clear();
+}
+
 /** Map of image file extensions to Bedrock-compatible format identifiers. */
 const IMAGE_EXTENSIONS: Record<string, string> = {
   '.png': 'png',

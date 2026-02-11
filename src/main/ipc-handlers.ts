@@ -231,7 +231,7 @@ export function registerIpcHandlers() {
       return { requestId: '', error: 'Rate limit exceeded — please slow down' };
     }
     const window = BrowserWindow.fromWebContents(event.sender);
-    if (!window) throw new Error('No window found');
+    if (!window) return { requestId: '', error: 'No window found' };
     const requestId = await sendMessage(params, window);
     return { requestId };
   });
@@ -259,7 +259,12 @@ export function registerIpcHandlers() {
     if (!checkRateLimit('file:read', 30, 10_000)) {
       return { error: 'Rate limit exceeded — please slow down' };
     }
-    return readFile(filePath);
+    try {
+      return await readFile(filePath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to read file';
+      return { error: message };
+    }
   });
 
   // --- Conversation Store ---
@@ -273,15 +278,24 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC.STORE_CREATE_CONVERSATION, (_event, id: string, title: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
     return createConversation(id, title);
   });
 
   ipcMain.handle(IPC.STORE_DELETE_CONVERSATION, (_event, id: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
     deleteConversation(id);
     return { success: true };
   });
 
   ipcMain.handle(IPC.STORE_UPDATE_CONVERSATION_TITLE, (_event, id: string, title: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
     updateConversationTitle(id, title);
     return { success: true };
   });
@@ -291,6 +305,9 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC.STORE_SAVE_MESSAGE, (_event, message) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
     saveMessage(message);
     return { success: true };
   });

@@ -141,22 +141,26 @@ export interface Conversation {
 
 // --- Stream Events ---
 
-/** Discriminated event types emitted during Bedrock Converse API streaming. */
-export type StreamEventType =
-  | 'messageStart'
-  | 'contentBlockStart'
-  | 'contentBlockDelta'
-  | 'contentBlockStop'
-  | 'messageStop'
-  | 'metadata'
-  | 'error';
-
-/** A streaming event pushed from the main process to the renderer via IPC. */
-export interface StreamEvent {
-  requestId: string;
-  type: StreamEventType;
-  data: Record<string, unknown>;
+/** Data carried by a `contentBlockStart` event. */
+export interface ContentBlockStartData {
+  toolUse?: { toolUseId: string; name: string };
 }
+
+/** Data carried by a `contentBlockDelta` event. */
+export interface ContentBlockDeltaData {
+  text?: string;
+  toolUse?: { input?: string };
+}
+
+/** Discriminated union of all streaming events pushed from main to renderer. */
+export type StreamEvent =
+  | { requestId: string; type: 'messageStart'; data: { role: string } }
+  | { requestId: string; type: 'contentBlockStart'; data: { contentBlockIndex: number; start: ContentBlockStartData } }
+  | { requestId: string; type: 'contentBlockDelta'; data: { contentBlockIndex: number; delta: ContentBlockDeltaData } }
+  | { requestId: string; type: 'contentBlockStop'; data: { contentBlockIndex: number } }
+  | { requestId: string; type: 'messageStop'; data: { stopReason: string } }
+  | { requestId: string; type: 'metadata'; data: { usage?: Record<string, unknown> } }
+  | { requestId: string; type: 'error'; data: { message: string } };
 
 // --- File Upload ---
 

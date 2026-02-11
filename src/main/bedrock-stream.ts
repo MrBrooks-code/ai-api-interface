@@ -159,6 +159,7 @@ export async function sendMessage(
 
       for await (const event of response.stream) {
         if (abortController.signal.aborted) break;
+        if (window.isDestroyed()) break;
 
         if (event.messageStart) {
           window.webContents.send(IPC.CHAT_STREAM_EVENT, {

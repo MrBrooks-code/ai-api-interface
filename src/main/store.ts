@@ -124,13 +124,16 @@ export function saveMessage(message: ChatMessage): void {
     return value;
   });
 
-  db.prepare(
-    'INSERT OR REPLACE INTO messages (id, conversation_id, role, content, timestamp, stop_reason) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(message.id, message.conversationId, message.role, contentJson, message.timestamp, message.stopReason ?? null);
+  const insertAndUpdate = db.transaction(() => {
+    db.prepare(
+      'INSERT OR REPLACE INTO messages (id, conversation_id, role, content, timestamp, stop_reason) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(message.id, message.conversationId, message.role, contentJson, message.timestamp, message.stopReason ?? null);
 
-  // Update conversation timestamp
-  db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?')
-    .run(message.timestamp, message.conversationId);
+    db.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?')
+      .run(message.timestamp, message.conversationId);
+  });
+
+  insertAndUpdate();
 }
 
 /**

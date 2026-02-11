@@ -5,7 +5,7 @@
  * via {@link ToolActivityGroup}.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import MessageBubble from './MessageBubble';
 import ToolActivityGroup from './ToolActivityGroup';
 import { useChatStore } from '../stores/chat-store';
@@ -117,7 +117,7 @@ export default function MessageList({ messages, isStreaming }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isStreaming]);
 
-  const groups = groupMessages(messages);
+  const groups = useMemo(() => groupMessages(messages), [messages]);
   const lastMsgId = messages[messages.length - 1]?.id;
 
   return (

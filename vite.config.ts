@@ -5,9 +5,10 @@ import electronRenderer from 'vite-plugin-electron-renderer';
 import path from 'path';
 
 const root = path.resolve(__dirname, 'src/renderer');
-const isProduction = process.env.NODE_ENV === 'production';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const isProduction = mode === 'production';
+  return {
   plugins: [
     react(),
     electron([
@@ -59,4 +60,5 @@ export default defineConfig({
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
   },
+  };
 });

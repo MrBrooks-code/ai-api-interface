@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { ChatMessage, ContentBlock, Conversation, ConnectionStatus, BedrockModel, ThemeId, SsoLoginStatus } from '../../shared/types';
+import type { ChatMessage, ContentBlock, ContentBlockStartData, ContentBlockDeltaData, Conversation, ConnectionStatus, BedrockModel, ThemeId, SsoLoginStatus } from '../../shared/types';
 
 /** Default system prompt used when the user hasn't customized one yet. */
 export const DEFAULT_SYSTEM_PROMPT =
@@ -42,8 +42,8 @@ interface ChatState {
   setStreaming: (streaming: boolean, requestId?: string | null, messageId?: string | null) => void;
 
   // Streaming content accumulation
-  appendToStreamingMessage: (contentBlockIndex: number, delta: Record<string, unknown>) => void;
-  startContentBlock: (contentBlockIndex: number, start: Record<string, unknown>) => void;
+  appendToStreamingMessage: (contentBlockIndex: number, delta: ContentBlockDeltaData) => void;
+  startContentBlock: (contentBlockIndex: number, start: ContentBlockStartData) => void;
   finalizeStreamingMessage: (stopReason: string) => void;
 
   // Models
@@ -139,11 +139,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
           }
 
           if (start.toolUse) {
-            const tu = start.toolUse as { toolUseId: string; name: string };
             content[contentBlockIndex] = {
               type: 'toolUse',
-              toolUseId: tu.toolUseId,
-              name: tu.name,
+              toolUseId: start.toolUse.toolUseId,
+              name: start.toolUse.name,
               input: {},
             };
           }
@@ -172,11 +171,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
           if (delta.text && block.type === 'text') {
             content[contentBlockIndex] = {
               ...block,
-              text: block.text + (delta.text as string),
+              text: block.text + delta.text,
             };
           } else if (delta.toolUse && block.type === 'toolUse') {
             // Accumulate tool input JSON string
-            const inputChunk = (delta.toolUse as { input?: string }).input ?? '';
+            const inputChunk = delta.toolUse.input ?? '';
             const currentInput = (block as { _rawInput?: string })._rawInput ?? '';
             content[contentBlockIndex] = {
               ...block,

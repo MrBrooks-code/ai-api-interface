@@ -19,6 +19,7 @@ import {
   clearTokenCache,
   type SsoLoginProgress,
 } from './sso-auth';
+import { clearAllowedPaths } from './file-handler';
 
 let resolvedCredentials: AwsCredentialIdentity | null = null;
 let currentProfile: string | null = null;
@@ -196,6 +197,7 @@ export function disconnect(): void {
   currentSsoConfigId = null;
   currentSsoConfigName = null;
   clearTokenCache();
+  clearAllowedPaths();
 }
 
 /**
@@ -205,6 +207,7 @@ export function disconnect(): void {
  */
 export function startSessionTimer(durationMinutes: number, onExpired: () => void): void {
   clearSessionTimer();
+  if (durationMinutes <= 0) return;
   sessionTimer = setTimeout(() => {
     sessionTimer = null;
     disconnect();

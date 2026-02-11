@@ -29,7 +29,10 @@ export function useAutoConnect() {
       setSelectedModelId,
     } = useChatStore.getState();
 
-    let cleanupSsoListener: (() => void) | undefined;
+    // Register the listener before the async flow so cleanup is always valid.
+    const cleanupSsoListener = ipc.onSsoStatus((status) => {
+      setAutoConnectSsoStatus(status);
+    });
 
     (async () => {
       // Skip if already connected (e.g. profile restored by main process).
@@ -48,11 +51,6 @@ export function useAutoConnect() {
 
       setAutoConnecting(true);
       setAutoConnectSsoStatus({ stage: 'registering' });
-
-      // Listen for device-auth progress events from the main process.
-      cleanupSsoListener = ipc.onSsoStatus((status) => {
-        setAutoConnectSsoStatus(status);
-      });
 
       const result = await ipc.connectWithSsoConfig(config.id);
 
@@ -81,9 +79,7 @@ export function useAutoConnect() {
       }, 1500);
     })();
 
-    return () => {
-      cleanupSsoListener?.();
-    };
+    return cleanupSsoListener;
   }, []);
 
   // Listen for session-expiry events pushed from the main process and

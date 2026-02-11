@@ -9,15 +9,18 @@ import { v4 as uuidv4 } from 'uuid';
 import { useChatStore } from '../stores/chat-store';
 import { ipc } from '../lib/ipc-client';
 import { buildUserContent, buildToolResultBlock } from '../lib/message-builder';
-import type { ChatMessage, ContentBlock, StreamEvent, UploadedFile } from '../../shared/types';
+import type { ChatMessage, ContentBlock, StreamEvent, UploadedFile, ContentBlockStartData, ContentBlockDeltaData } from '../../shared/types';
 
 export function useChat() {
   const store = useChatStore();
   const cleanupRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(true);
 
   // Set up stream event listener
   useEffect(() => {
+    mountedRef.current = true;
     const cleanup = ipc.onStreamEvent((event: StreamEvent) => {
+      if (!mountedRef.current) return;
       const state = useChatStore.getState();
       if (event.requestId !== state.activeRequestId) return;
 
@@ -28,15 +31,15 @@ export function useChat() {
 
         case 'contentBlockStart':
           state.startContentBlock(
-            event.data.contentBlockIndex as number,
-            event.data.start as Record<string, unknown>
+            event.data.contentBlockIndex,
+            event.data.start
           );
           break;
 
         case 'contentBlockDelta':
           state.appendToStreamingMessage(
-            event.data.contentBlockIndex as number,
-            event.data.delta as Record<string, unknown>
+            event.data.contentBlockIndex,
+            event.data.delta
           );
           break;
 
@@ -45,7 +48,7 @@ export function useChat() {
           break;
 
         case 'messageStop': {
-          const stopReason = event.data.stopReason as string;
+          const stopReason = event.data.stopReason;
           state.finalizeStreamingMessage(stopReason);
 
           // After finalizing, check if we need tool execution
@@ -66,7 +69,7 @@ export function useChat() {
           break;
 
         case 'error': {
-          const errMsg = (event.data.message as string) ?? 'Unknown error';
+          const errMsg = event.data.message ?? 'Unknown error';
           state.setStreaming(false);
           // Surface error as a visible message in the chat
           const errState = useChatStore.getState();
@@ -83,7 +86,10 @@ export function useChat() {
     });
 
     cleanupRef.current = cleanup;
-    return cleanup;
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
   }, []);
 
   const handleToolUseLoop = useCallback(async (assistantMessage: ChatMessage) => {

@@ -4,7 +4,7 @@
  * sidebar connection status button.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ProfileSelector from './ProfileSelector';
 import SsoWizard from './SsoWizard';
 import { useSettings } from '../hooks/useSettings';
@@ -120,14 +120,18 @@ export default function SettingsPanel() {
   };
 
   // Group models by provider for the dropdown
-  const modelsByProvider = availableModels.reduce(
-    (acc, m) => {
-      const key = m.provider;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(m);
-      return acc;
-    },
-    {} as Record<string, typeof availableModels>
+  const modelsByProvider = useMemo(
+    () =>
+      availableModels.reduce<Record<string, typeof availableModels>>(
+        (acc, m) => {
+          const key = m.provider;
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(m);
+          return acc;
+        },
+        {}
+      ),
+    [availableModels]
   );
 
   return (
