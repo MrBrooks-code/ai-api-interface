@@ -661,27 +661,9 @@ export default function Sidebar() {
       className="relative bg-surface-light flex flex-col border-r border-surface-lighter flex-shrink-0"
       style={{ width }}
     >
-      <div className="px-3 pt-2 pb-2 flex gap-2">
-        <button
-          onClick={createConversation}
-          className="flex-1 px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/25 hover:text-text transition-colors text-sm font-medium"
-        >
-          + New Chat
-        </button>
-        {!isSearching && (
-          <button
-            onClick={handleCreateFolder}
-            title="New Folder"
-            className="px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/25 hover:text-text transition-colors text-sm font-medium"
-          >
-            + Folder
-          </button>
-        )}
-      </div>
-
       {/* Search filter */}
       {(conversations.length > 0 || archivedConversations.length > 0) && (
-        <div className="px-3 pb-2">
+        <div className="px-3 pt-2 pb-1.5">
           <input
             ref={searchInputRef}
             type="text"
@@ -692,6 +674,33 @@ export default function Sidebar() {
           />
         </div>
       )}
+
+      <div className="px-3 pb-2 flex flex-col gap-1">
+        <button
+          onClick={createConversation}
+          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/25 hover:text-text transition-colors text-sm font-medium text-left"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+          New Chat
+        </button>
+        {!isSearching && (
+          <button
+            onClick={handleCreateFolder}
+            title="New Folder"
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/25 hover:text-text transition-colors text-sm font-medium text-left"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              <line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
+            </svg>
+            New Folder
+          </button>
+        )}
+      </div>
+
+      <div className="mx-3 border-t border-surface-lighter" />
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto px-2 py-1">

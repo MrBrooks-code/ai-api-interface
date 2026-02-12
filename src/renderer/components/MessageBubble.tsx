@@ -142,7 +142,7 @@ export default function MessageBubble({ message, isStreaming }: Props) {
           {message.content.map((block, i) => renderBlock(block, i))}
         </div>
 
-        <div className="flex items-center mt-1">
+        <div className="flex items-center justify-end mt-1">
           <span className="text-[10px] text-text-dim">
             {formatTime(message.timestamp)}
           </span>
