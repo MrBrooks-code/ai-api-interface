@@ -258,7 +258,7 @@ export default function ArtifactPanel() {
   const [srcdoc, setSrcdoc] = useState('');
   const mermaidIdCounter = useRef(0);
 
-  // Slide open when previewPanel becomes non-null
+  // Slide open when previewPanel becomes non-null, unmount when it goes null externally
   useEffect(() => {
     if (previewPanel) {
       isClosing.current = false;
@@ -273,6 +273,11 @@ export default function ArtifactPanel() {
         });
       }
       // If already mounted (swapping content), width stays as-is — no animation needed
+    } else if (mounted) {
+      // Store cleared previewPanel externally (e.g. conversation switch/delete)
+      setAnimatedWidth(0);
+      setMounted(false);
+      isClosing.current = false;
     }
   }, [previewPanel]); // eslint-disable-line react-hooks/exhaustive-deps
 
