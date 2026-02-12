@@ -70,9 +70,18 @@ interface ChatState {
   setAutoConnecting: (connecting: boolean) => void;
   setAutoConnectSsoStatus: (status: SsoLoginStatus | null) => void;
 
+  // Sidebar visibility
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  toggleSidebar: () => void;
+
   // Settings panel
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
+
+  // Draft title preview for the sidebar when composing a new chat
+  draftTitle: string;
+  setDraftTitle: (title: string) => void;
 
   // Create a new message helper
   createMessage: (
@@ -246,9 +255,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setAutoConnecting: (connecting) => set({ autoConnecting: connecting }),
   setAutoConnectSsoStatus: (status) => set({ autoConnectSsoStatus: status }),
 
+  // Sidebar visibility
+  sidebarCollapsed: false,
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+
   // Settings panel
   showSettings: false,
   setShowSettings: (show) => set({ showSettings: show }),
+
+  // Draft title
+  draftTitle: '',
+  setDraftTitle: (title) => set({ draftTitle: title }),
 
   // Helper
   createMessage: (conversationId, role, content) => ({

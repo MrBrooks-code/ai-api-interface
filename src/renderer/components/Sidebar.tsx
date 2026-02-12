@@ -19,10 +19,12 @@ export default function Sidebar() {
   const { conversations, activeConversationId, loadMessages, createConversation, deleteConversation } =
     useConversations();
   const connectionStatus = useChatStore((s) => s.connectionStatus);
+  const draftTitle = useChatStore((s) => s.draftTitle);
   const setShowSettings = useChatStore((s) => s.setShowSettings);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Conversation[] | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // --- Resizable sidebar ---
   const [width, setWidth] = useState(DEFAULT_WIDTH);
@@ -70,6 +72,23 @@ export default function Sidebar() {
     return () => clearTimeout(debounceRef.current);
   }, [searchQuery]);
 
+  /** Focus the search input when the global Cmd/Ctrl+K shortcut fires. */
+  useEffect(() => {
+    const handler = () => {
+      // Uncollapse sidebar if it's collapsed so the input becomes visible
+      const { sidebarCollapsed, setSidebarCollapsed } = useChatStore.getState();
+      if (sidebarCollapsed) {
+        setSidebarCollapsed(false);
+        // Wait a frame for the sidebar to render before focusing
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+      } else {
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('focus-search-input', handler);
+    return () => window.removeEventListener('focus-search-input', handler);
+  }, []);
+
   const displayedConversations = searchResults ?? conversations;
 
   return (
@@ -90,6 +109,7 @@ export default function Sidebar() {
       {conversations.length > 0 && (
         <div className="px-3 pb-2">
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Search conversations…"
             value={searchQuery}
@@ -101,6 +121,17 @@ export default function Sidebar() {
 
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto px-2 py-1">
+        {/* Animated draft indicator shown while composing a new chat */}
+        {activeConversationId === null && draftTitle && (
+          <div className="flex items-center px-3 py-2 rounded-lg mb-0.5 bg-surface-lighter">
+            <span className="flex gap-1 items-center py-0.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-text-dim thinking-dot" />
+              <span className="w-1.5 h-1.5 rounded-full bg-text-dim thinking-dot" />
+              <span className="w-1.5 h-1.5 rounded-full bg-text-dim thinking-dot" />
+            </span>
+          </div>
+        )}
+
         {displayedConversations.map((convo) => (
           <button
             key={convo.id}

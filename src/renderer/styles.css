@@ -334,6 +334,22 @@ pre code.hljs {
   animation-delay: 0.4s;
 }
 
+/* Fade-in animation for new chat welcome screen */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
 /* Smooth transitions */
 .transition-sidebar {
   transition: width 0.2s ease-in-out;

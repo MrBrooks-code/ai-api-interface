@@ -4,7 +4,7 @@
  * conversation is active.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import MessageList from './MessageList';
 import InputBar from './InputBar';
 import { useChat } from '../hooks/useChat';
@@ -23,6 +23,7 @@ const DEFAULT_BANNER: LoginBanner = {
 export default function ChatView() {
   const { messages, isStreaming, sendMessage, abortStream } = useChat();
   const connectionStatus = useChatStore((s) => s.connectionStatus);
+  const activeConversationId = useChatStore((s) => s.activeConversationId);
   const autoConnecting = useChatStore((s) => s.autoConnecting);
   const autoConnectSsoStatus = useChatStore((s) => s.autoConnectSsoStatus);
   const setShowSettings = useChatStore((s) => s.setShowSettings);
@@ -40,6 +41,17 @@ export default function ChatView() {
 
   const ssoStage = autoConnectSsoStatus?.stage;
   const showOverlay = autoConnecting && ssoStage !== undefined;
+
+  // Counter that increments each time we enter the empty/welcome state,
+  // used as a React key to re-mount and trigger the fade-in animation.
+  const welcomeKeyRef = useRef(0);
+  const prevShowWelcome = useRef(false);
+  const showWelcome = !showOverlay && messages.length === 0;
+
+  if (showWelcome && !prevShowWelcome.current) {
+    welcomeKeyRef.current += 1;
+  }
+  prevShowWelcome.current = showWelcome;
 
   return (
     <div className="flex flex-col h-full">
@@ -82,7 +94,7 @@ export default function ChatView() {
           </div>
         </div>
       ) : messages.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div key={welcomeKeyRef.current} className="flex-1 flex items-center justify-center animate-fade-in">
           <div className="text-center max-w-md px-4">
             {customTheme?.logo && (
               <img

@@ -23,11 +23,19 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
+  const setDraftTitle = useChatStore((s) => s.setDraftTitle);
 
   /** Focus the textarea whenever the active conversation changes (including new chat). */
   useEffect(() => {
     textareaRef.current?.focus();
   }, [activeConversationId]);
+
+  /** Clear the draft title when the user switches to an existing conversation. */
+  useEffect(() => {
+    if (activeConversationId !== null) {
+      setDraftTitle('');
+    }
+  }, [activeConversationId, setDraftTitle]);
 
   /** Focus the textarea when the input becomes enabled (e.g. after connecting to AWS). */
   useEffect(() => {
@@ -35,6 +43,13 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
       textareaRef.current?.focus();
     }
   }, [disabled]);
+
+  /** Focus the textarea when the global Shift+Escape shortcut fires. */
+  useEffect(() => {
+    const handler = () => textareaRef.current?.focus();
+    window.addEventListener('focus-chat-input', handler);
+    return () => window.removeEventListener('focus-chat-input', handler);
+  }, []);
 
   const handleSubmit = useCallback(() => {
     if (isStreaming) {
@@ -45,6 +60,7 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
     const trimmed = text.trim();
     if (!trimmed && files.length === 0) return;
 
+    setDraftTitle('');
     onSend(trimmed, files.length > 0 ? files : undefined);
     setText('');
     setFiles([]);
@@ -53,7 +69,7 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-  }, [text, files, isStreaming, onSend, onAbort]);
+  }, [text, files, isStreaming, onSend, onAbort, setDraftTitle]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -66,7 +82,16 @@ export default function InputBar({ onSend, onAbort, isStreaming, disabled }: Pro
   );
 
   const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(e.target.value);
+    const value = e.target.value;
+    setText(value);
+
+    // Update draft title preview in the sidebar when composing a new chat.
+    // Read activeConversationId directly from the store to avoid stale closures.
+    const currentActiveId = useChatStore.getState().activeConversationId;
+    if (currentActiveId === null) {
+      useChatStore.getState().setDraftTitle(value.trim().slice(0, 50));
+    }
+
     // Auto-resize
     const el = e.target;
     el.style.height = 'auto';
