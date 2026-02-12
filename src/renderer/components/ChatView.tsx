@@ -12,13 +12,6 @@ import { useChatStore } from '../stores/chat-store';
 import { ipc } from '../lib/ipc-client';
 import type { LoginBanner, CustomThemeConfig } from '../../shared/types';
 
-/** Fallback banner shown when `admin-config.json` is missing or unreadable. */
-const DEFAULT_BANNER: LoginBanner = {
-  title: 'Bedrock Chat',
-  message: 'Chat with Claude Sonnet 4.5 via Amazon Bedrock',
-  titlebar: 'Bedrock Chat',
-};
-
 /** Displays the conversation messages or the logon banner when idle. */
 export default function ChatView() {
   const { messages, isStreaming, sendMessage, abortStream } = useChat();
@@ -27,7 +20,7 @@ export default function ChatView() {
   const autoConnecting = useChatStore((s) => s.autoConnecting);
   const autoConnectSsoStatus = useChatStore((s) => s.autoConnectSsoStatus);
   const setShowSettings = useChatStore((s) => s.setShowSettings);
-  const [banner, setBanner] = useState<LoginBanner>(DEFAULT_BANNER);
+  const [banner, setBanner] = useState<LoginBanner | null>(null);
   const [customTheme, setCustomTheme] = useState<CustomThemeConfig | undefined>();
 
   useEffect(() => {
@@ -35,7 +28,7 @@ export default function ChatView() {
       setBanner(config.loginBanner);
       setCustomTheme(config.customTheme);
     }).catch(() => {
-      // Fall back to defaults on any error
+      // Fall back to empty — admin-config.json is missing or unreadable
     });
   }, []);
 
@@ -93,7 +86,7 @@ export default function ChatView() {
             )}
           </div>
         </div>
-      ) : messages.length === 0 ? (
+      ) : messages.length === 0 && banner ? (
         <div key={welcomeKeyRef.current} className="flex-1 flex items-center justify-center animate-fade-in">
           <div className="text-center max-w-md px-4">
             {customTheme?.logo && (
@@ -103,10 +96,14 @@ export default function ChatView() {
                 className="max-h-16 mx-auto mb-4"
               />
             )}
-            <h1 className="text-2xl font-semibold text-text mb-2">{banner.title}</h1>
-            <p className="text-text-muted text-sm mb-6 whitespace-pre-line">
-              {banner.message}
-            </p>
+            {banner.title && (
+              <h1 className="text-2xl font-semibold text-text mb-2">{banner.title}</h1>
+            )}
+            {banner.message && (
+              <p className="text-text-muted text-sm mb-6 whitespace-pre-line">
+                {banner.message}
+              </p>
+            )}
             {!connectionStatus.connected && (
               <p className="text-accent-yellow text-sm">
                 Connect to AWS to start chatting. Click the connection status in the sidebar.

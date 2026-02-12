@@ -1,14 +1,13 @@
 {
   "loginBanner": {
-    "title": "",
+    "title": "Bedrock Chat",
     "message": "This is a private system. Unauthorized access is prohibited. All activities are monitored and logged.",
-    "titlebar": "Bedrock AI"
+    "titlebar": "Bedrock Chat"
   },
   "sessionDurationMinutes": 60,
   "customTheme": {
     "name": "Corporate Light",
     "baseTheme": "catppuccin-latte",
-    "logoPath": "branding.png",
     "colors": {
       "primary": "#003f87",
       "primaryHover": "#00529e",

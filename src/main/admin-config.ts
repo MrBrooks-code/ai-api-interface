@@ -13,7 +13,7 @@ import type { AdminConfig, BuiltInThemeId, CustomThemeConfig, ThemeColors } from
 const DEFAULT_CONFIG: AdminConfig = {
   loginBanner: {
     title: 'Bedrock Chat',
-    message: 'Chat with Claude Sonnet 4.5 via Amazon Bedrock',
+    message: 'Welcome to Bedrock Chat.',
     titlebar: 'Bedrock Chat',
   },
   sessionDurationMinutes: 60,
