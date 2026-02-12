@@ -16,7 +16,7 @@ const DEFAULT_WIDTH = 256;
 
 /** Navigation sidebar with conversation history and connection status. */
 export default function Sidebar() {
-  const { conversations, activeConversationId, loadMessages, createConversation, deleteConversation } =
+  const { conversations, activeConversationId, loadMessages, createConversation, deleteConversation, renameConversation } =
     useConversations();
   const connectionStatus = useChatStore((s) => s.connectionStatus);
   const draftTitle = useChatStore((s) => s.draftTitle);
@@ -25,6 +25,37 @@ export default function Sidebar() {
   const [searchResults, setSearchResults] = useState<Conversation[] | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline rename state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  /** Commits the rename if the title changed and is non-empty, then exits edit mode. */
+  const commitRename = useCallback(() => {
+    if (editingId) {
+      const trimmed = editingTitle.trim();
+      if (trimmed && trimmed !== conversations.find((c) => c.id === editingId)?.title) {
+        renameConversation(editingId, trimmed);
+      }
+    }
+    setEditingId(null);
+    setEditingTitle('');
+  }, [editingId, editingTitle, conversations, renameConversation]);
+
+  /** Cancels the inline rename without saving. */
+  const cancelRename = useCallback(() => {
+    setEditingId(null);
+    setEditingTitle('');
+  }, []);
+
+  // Auto-focus and select the inline rename input when it appears
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingId]);
 
   // --- Resizable sidebar ---
   const [width, setWidth] = useState(DEFAULT_WIDTH);
@@ -141,9 +172,36 @@ export default function Sidebar() {
                 ? 'bg-surface-lighter text-text'
                 : 'text-text-muted hover:bg-primary/10 hover:text-text'
             }`}
-            onClick={() => loadMessages(convo.id)}
+            onClick={() => {
+              if (editingId !== convo.id) loadMessages(convo.id);
+            }}
+            onDoubleClick={() => {
+              setEditingId(convo.id);
+              setEditingTitle(convo.title);
+            }}
           >
-            <span className="flex-1 truncate text-sm">{convo.title}</span>
+            {editingId === convo.id ? (
+              <input
+                ref={editInputRef}
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commitRename();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelRename();
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 min-w-0 text-sm bg-transparent border-b border-primary outline-none text-text"
+              />
+            ) : (
+              <span className="flex-1 truncate text-sm">{convo.title}</span>
+            )}
             <span
               role="button"
               tabIndex={0}

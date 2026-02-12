@@ -37,6 +37,11 @@ export function useConversations() {
     store.removeConversation(id);
   }, []);
 
+  const renameConversation = useCallback(async (id: string, newTitle: string) => {
+    await ipc.updateConversationTitle(id, newTitle);
+    store.updateConversationTitle(id, newTitle);
+  }, []);
+
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
@@ -49,5 +54,6 @@ export function useConversations() {
     loadMessages,
     createConversation,
     deleteConversation,
+    renameConversation,
   };
 }
