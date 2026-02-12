@@ -17,7 +17,7 @@ node_modules/
 credentials.json
 
 # Branding assets
-resources/branding.png
+assets/branding.png
 
 # OS / editor
 .DS_Store

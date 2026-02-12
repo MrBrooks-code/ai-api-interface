@@ -44,6 +44,12 @@ import {
   listArchivedConversations,
   saveMessage,
   getMessages,
+  listFolders,
+  createFolder,
+  renameFolder,
+  deleteFolder,
+  moveConversationToFolder,
+  reorderConversations,
   listSsoConfigs,
   getSsoConfig,
   saveSsoConfig,
@@ -345,6 +351,51 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC.STORE_GET_MESSAGES, (_event, conversationId: string) => {
     return getMessages(conversationId);
+  });
+
+  // --- Folders ---
+
+  ipcMain.handle(IPC.STORE_LIST_FOLDERS, () => {
+    return listFolders();
+  });
+
+  ipcMain.handle(IPC.STORE_CREATE_FOLDER, (_event, id: string, name: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
+    return createFolder(id, name);
+  });
+
+  ipcMain.handle(IPC.STORE_RENAME_FOLDER, (_event, id: string, name: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
+    renameFolder(id, name);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.STORE_DELETE_FOLDER, (_event, id: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
+    deleteFolder(id);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.STORE_MOVE_CONVERSATION_TO_FOLDER, (_event, conversationId: string, folderId: string | null) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
+    moveConversationToFolder(conversationId, folderId);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.STORE_REORDER_CONVERSATIONS, (_event, items: Array<{ id: string; sortOrder: number }>) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
+    reorderConversations(items);
+    return { success: true };
   });
 
   // --- Admin Config ---

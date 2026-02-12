@@ -129,6 +129,17 @@ export interface ChatMessage {
   stopReason?: string;
 }
 
+// --- Folders ---
+
+/** A conversation folder for grouping related chats in the sidebar. */
+export interface Folder {
+  id: string;
+  name: string;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // --- Conversations ---
 
 /** A conversation record persisted to the local SQLite database. */
@@ -139,6 +150,10 @@ export interface Conversation {
   updatedAt: number;
   /** Unix ms timestamp when archived, or undefined if active. */
   archivedAt?: number;
+  /** The folder this conversation belongs to, or undefined if uncategorized. */
+  folderId?: string;
+  /** Manual sort position within its group. NULL means default (by updated_at). */
+  sortOrder?: number;
 }
 
 // --- Stream Events ---

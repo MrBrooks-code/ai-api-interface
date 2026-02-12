@@ -59,6 +59,17 @@ export const ipc = {
   archiveConversation: (id: string) => getAPI().archiveConversation(id),
   unarchiveConversation: (id: string) => getAPI().unarchiveConversation(id),
   listArchivedConversations: () => getAPI().listArchivedConversations(),
+
+  // Folders
+  listFolders: () => getAPI().listFolders(),
+  createFolder: (id: string, name: string) => getAPI().createFolder(id, name),
+  renameFolder: (id: string, name: string) => getAPI().renameFolder(id, name),
+  deleteFolder: (id: string) => getAPI().deleteFolder(id),
+  moveConversationToFolder: (conversationId: string, folderId: string | null) =>
+    getAPI().moveConversationToFolder(conversationId, folderId),
+  reorderConversations: (items: Array<{ id: string; sortOrder: number }>) =>
+    getAPI().reorderConversations(items),
+
   saveMessage: (message: Parameters<typeof window.electronAPI.saveMessage>[0]) =>
     getAPI().saveMessage(message),
   getMessages: (conversationId: string) => getAPI().getMessages(conversationId),

@@ -57,6 +57,12 @@ export function useConversations() {
     store.unarchiveConversation(id);
   }, []);
 
+  const reorderConversations = useCallback(async (orderedIds: string[]) => {
+    const items = orderedIds.map((id, i) => ({ id, sortOrder: i }));
+    store.reorderConversations(orderedIds);
+    await ipc.reorderConversations(items);
+  }, []);
+
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
@@ -76,5 +82,6 @@ export function useConversations() {
     renameConversation,
     archiveConversation,
     unarchiveConversation,
+    reorderConversations,
   };
 }

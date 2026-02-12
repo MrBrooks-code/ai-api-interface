@@ -7,7 +7,7 @@
 
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import type { ChatMessage, ContentBlock, ContentBlockStartData, ContentBlockDeltaData, Conversation, ConnectionStatus, BedrockModel, ThemeId, SsoLoginStatus } from '../../shared/types';
+import type { ChatMessage, ContentBlock, ContentBlockStartData, ContentBlockDeltaData, Conversation, ConnectionStatus, BedrockModel, Folder, ThemeId, SsoLoginStatus } from '../../shared/types';
 
 /** Default system prompt used when the user hasn't customized one yet. */
 export const DEFAULT_SYSTEM_PROMPT =
@@ -37,6 +37,17 @@ interface ChatState {
   toggleArchiveSection: () => void;
   archiveConversation: (id: string) => void;
   unarchiveConversation: (id: string) => void;
+
+  // Folders
+  folders: Folder[];
+  collapsedFolderIds: Set<string>;
+  setFolders: (folders: Folder[]) => void;
+  addFolder: (folder: Folder) => void;
+  removeFolder: (id: string) => void;
+  updateFolderName: (id: string, name: string) => void;
+  toggleFolderCollapsed: (id: string) => void;
+  moveConversationToFolder: (conversationId: string, folderId: string | null) => void;
+  reorderConversations: (orderedIds: string[]) => void;
 
   // Messages
   messages: ChatMessage[];
@@ -155,7 +166,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const convo = state.conversations.find((c) => c.id === id);
       if (!convo) return state;
-      const archived = { ...convo, archivedAt: Date.now() };
+      const archived = { ...convo, archivedAt: Date.now(), folderId: undefined };
       return {
         conversations: state.conversations.filter((c) => c.id !== id),
         archivedConversations: [archived, ...state.archivedConversations],
@@ -174,6 +185,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
         conversations: [restored, ...state.conversations],
       };
     }),
+
+  // Folders
+  folders: [],
+  collapsedFolderIds: new Set<string>(),
+  setFolders: (folders) => set({ folders }),
+  addFolder: (folder) =>
+    set((state) => ({ folders: [...state.folders, folder] })),
+  removeFolder: (id) =>
+    set((state) => ({
+      folders: state.folders.filter((f) => f.id !== id),
+      conversations: state.conversations.map((c) =>
+        c.folderId === id ? { ...c, folderId: undefined } : c
+      ),
+    })),
+  updateFolderName: (id, name) =>
+    set((state) => ({
+      folders: state.folders.map((f) =>
+        f.id === id ? { ...f, name, updatedAt: Date.now() } : f
+      ),
+    })),
+  toggleFolderCollapsed: (id) =>
+    set((state) => {
+      const next = new Set(state.collapsedFolderIds);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return { collapsedFolderIds: next };
+    }),
+  moveConversationToFolder: (conversationId, folderId) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === conversationId ? { ...c, folderId: folderId ?? undefined, sortOrder: undefined } : c
+      ),
+    })),
+  reorderConversations: (orderedIds) =>
+    set((state) => ({
+      conversations: state.conversations.map((c) => {
+        const idx = orderedIds.indexOf(c.id);
+        return idx >= 0 ? { ...c, sortOrder: idx } : c;
+      }),
+      archivedConversations: state.archivedConversations.map((c) => {
+        const idx = orderedIds.indexOf(c.id);
+        return idx >= 0 ? { ...c, sortOrder: idx } : c;
+      }),
+    })),
 
   // Messages
   messages: [],

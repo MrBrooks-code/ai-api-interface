@@ -20,6 +20,7 @@ import type {
   UploadedFile,
   Conversation,
   ChatMessage,
+  Folder,
   ToolResult,
 } from '../shared/types';
 
@@ -128,6 +129,25 @@ const electronAPI = {
 
   listArchivedConversations: (): Promise<Conversation[]> =>
     ipcRenderer.invoke(IPC.STORE_LIST_ARCHIVED_CONVERSATIONS),
+
+  // --- Folders ---
+  listFolders: (): Promise<Folder[]> =>
+    ipcRenderer.invoke(IPC.STORE_LIST_FOLDERS),
+
+  createFolder: (id: string, name: string): Promise<Folder> =>
+    ipcRenderer.invoke(IPC.STORE_CREATE_FOLDER, id, name),
+
+  renameFolder: (id: string, name: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC.STORE_RENAME_FOLDER, id, name),
+
+  deleteFolder: (id: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC.STORE_DELETE_FOLDER, id),
+
+  moveConversationToFolder: (conversationId: string, folderId: string | null): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC.STORE_MOVE_CONVERSATION_TO_FOLDER, conversationId, folderId),
+
+  reorderConversations: (items: Array<{ id: string; sortOrder: number }>): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC.STORE_REORDER_CONVERSATIONS, items),
 
   saveMessage: (message: ChatMessage): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC.STORE_SAVE_MESSAGE, message),

@@ -149,6 +149,21 @@ Seven built-in themes are available under Settings > Appearance:
 
 Theme selection persists across sessions.
 
+## Keyboard Shortcuts
+
+Global shortcuts matching the ChatGPT desktop app. On macOS use **Cmd**, on Windows/Linux use **Ctrl**.
+
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + Shift + O` | New chat |
+| `Cmd/Ctrl + Shift + S` | Toggle sidebar |
+| `Cmd/Ctrl + Shift + C` | Copy last assistant response |
+| `Cmd/Ctrl + Shift + ;` | Copy last code block |
+| `Cmd/Ctrl + Shift + Backspace` | Delete current conversation |
+| `Cmd/Ctrl + .` | Stop streaming |
+| `Shift + Escape` | Focus chat input |
+| `Cmd/Ctrl + K` | Focus conversation search |
+
 ## Supported Regions
 
 **GovCloud:** `us-gov-west-1` (default), `us-gov-east-1`

@@ -53,6 +53,14 @@ export const IPC = {
   STORE_UNARCHIVE_CONVERSATION: 'store:unarchive-conversation',
   STORE_LIST_ARCHIVED_CONVERSATIONS: 'store:list-archived-conversations',
 
+  // Folder management
+  STORE_LIST_FOLDERS: 'store:list-folders',
+  STORE_CREATE_FOLDER: 'store:create-folder',
+  STORE_RENAME_FOLDER: 'store:rename-folder',
+  STORE_DELETE_FOLDER: 'store:delete-folder',
+  STORE_MOVE_CONVERSATION_TO_FOLDER: 'store:move-conversation-to-folder',
+  STORE_REORDER_CONVERSATIONS: 'store:reorder-conversations',
+
   // Admin config
   ADMIN_CONFIG_GET: 'admin:get-config',
 

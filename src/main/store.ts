@@ -8,7 +8,7 @@
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import path from 'path';
-import type { Conversation, ChatMessage, ContentBlock, SsoConfiguration } from '../shared/types';
+import type { Conversation, ChatMessage, ContentBlock, Folder, SsoConfiguration } from '../shared/types';
 
 let db: Database.Database;
 
@@ -66,13 +66,37 @@ export function initStore() {
   } catch {
     // Column already exists on subsequent launches.
   }
+
+  // Idempotent migration: add folder_id column for conversation folders.
+  try {
+    db.exec('ALTER TABLE conversations ADD COLUMN folder_id TEXT DEFAULT NULL');
+  } catch {
+    // Column already exists on subsequent launches.
+  }
+
+  // Idempotent migration: add sort_order column for manual conversation ordering.
+  try {
+    db.exec('ALTER TABLE conversations ADD COLUMN sort_order INTEGER DEFAULT NULL');
+  } catch {
+    // Column already exists on subsequent launches.
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS folders (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      sort_order INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
 }
 
-/** Returns all active (non-archived) conversations, most recently updated first. */
+/** Returns all active (non-archived) conversations, sorted by manual order then recency. */
 export function listConversations(): Conversation[] {
   const rows = db
-    .prepare('SELECT id, title, created_at, updated_at, archived_at FROM conversations WHERE archived_at IS NULL ORDER BY updated_at DESC')
-    .all() as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null }>;
+    .prepare('SELECT id, title, created_at, updated_at, archived_at, folder_id, sort_order FROM conversations WHERE archived_at IS NULL ORDER BY sort_order ASC, updated_at DESC')
+    .all() as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null; folder_id: string | null; sort_order: number | null }>;
 
   return rows.map((r) => ({
     id: r.id,
@@ -80,14 +104,16 @@ export function listConversations(): Conversation[] {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     archivedAt: r.archived_at ?? undefined,
+    folderId: r.folder_id ?? undefined,
+    sortOrder: r.sort_order ?? undefined,
   }));
 }
 
 /** Returns a single conversation by ID, or `null` if not found. */
 export function getConversation(id: string): Conversation | null {
   const row = db
-    .prepare('SELECT id, title, created_at, updated_at, archived_at FROM conversations WHERE id = ?')
-    .get(id) as { id: string; title: string; created_at: number; updated_at: number; archived_at: number | null } | undefined;
+    .prepare('SELECT id, title, created_at, updated_at, archived_at, folder_id, sort_order FROM conversations WHERE id = ?')
+    .get(id) as { id: string; title: string; created_at: number; updated_at: number; archived_at: number | null; folder_id: string | null; sort_order: number | null } | undefined;
 
   if (!row) return null;
   return {
@@ -96,6 +122,8 @@ export function getConversation(id: string): Conversation | null {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     archivedAt: row.archived_at ?? undefined,
+    folderId: row.folder_id ?? undefined,
+    sortOrder: row.sort_order ?? undefined,
   };
 }
 
@@ -119,9 +147,9 @@ export function updateConversationTitle(id: string, title: string): void {
     .run(title, Date.now(), id);
 }
 
-/** Marks a conversation as archived by setting `archived_at` to the current timestamp. */
+/** Marks a conversation as archived by setting `archived_at` and clearing its folder. */
 export function archiveConversation(id: string): void {
-  db.prepare('UPDATE conversations SET archived_at = ? WHERE id = ?')
+  db.prepare('UPDATE conversations SET archived_at = ?, folder_id = NULL WHERE id = ?')
     .run(Date.now(), id);
 }
 
@@ -132,11 +160,11 @@ export function unarchiveConversation(id: string): void {
     .run(now, id);
 }
 
-/** Returns all archived conversations, most recently archived first. */
+/** Returns all archived conversations, sorted by manual order then most recently archived. */
 export function listArchivedConversations(): Conversation[] {
   const rows = db
-    .prepare('SELECT id, title, created_at, updated_at, archived_at FROM conversations WHERE archived_at IS NOT NULL ORDER BY archived_at DESC')
-    .all() as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null }>;
+    .prepare('SELECT id, title, created_at, updated_at, archived_at, folder_id, sort_order FROM conversations WHERE archived_at IS NOT NULL ORDER BY sort_order ASC, archived_at DESC')
+    .all() as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null; folder_id: string | null; sort_order: number | null }>;
 
   return rows.map((r) => ({
     id: r.id,
@@ -144,6 +172,8 @@ export function listArchivedConversations(): Conversation[] {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     archivedAt: r.archived_at ?? undefined,
+    folderId: r.folder_id ?? undefined,
+    sortOrder: r.sort_order ?? undefined,
   }));
 }
 
@@ -182,13 +212,13 @@ export function searchConversations(query: string, includeArchived = false): Con
   const archiveFilter = includeArchived ? '' : 'AND c.archived_at IS NULL';
   const rows = db
     .prepare(
-      `SELECT DISTINCT c.id, c.title, c.created_at, c.updated_at, c.archived_at
+      `SELECT DISTINCT c.id, c.title, c.created_at, c.updated_at, c.archived_at, c.folder_id, c.sort_order
        FROM conversations c
        LEFT JOIN messages m ON m.conversation_id = c.id
        WHERE (c.title LIKE ? OR m.content LIKE ?) ${archiveFilter}
        ORDER BY c.updated_at DESC`
     )
-    .all(pattern, pattern) as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null }>;
+    .all(pattern, pattern) as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null; folder_id: string | null; sort_order: number | null }>;
 
   return rows.map((r) => ({
     id: r.id,
@@ -196,6 +226,8 @@ export function searchConversations(query: string, includeArchived = false): Con
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     archivedAt: r.archived_at ?? undefined,
+    folderId: r.folder_id ?? undefined,
+    sortOrder: r.sort_order ?? undefined,
   }));
 }
 
@@ -324,6 +356,73 @@ export function setSetting(key: string, value: string): void {
 export function wipeAllData(): void {
   db.exec('DELETE FROM messages');
   db.exec('DELETE FROM conversations');
+  db.exec('DELETE FROM folders');
   db.exec('DELETE FROM sso_configs');
   db.exec('VACUUM');
+}
+
+// --- Folders ---
+
+/** Returns all folders ordered by sort_order ascending. */
+export function listFolders(): Folder[] {
+  const rows = db
+    .prepare('SELECT id, name, sort_order, created_at, updated_at FROM folders ORDER BY sort_order ASC')
+    .all() as Array<{ id: string; name: string; sort_order: number; created_at: number; updated_at: number }>;
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    sortOrder: r.sort_order,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+}
+
+/** Creates a new folder with the next sort_order value. */
+export function createFolder(id: string, name: string): Folder {
+  const now = Date.now();
+  const maxRow = db
+    .prepare('SELECT MAX(sort_order) as max_sort FROM folders')
+    .get() as { max_sort: number | null };
+  const sortOrder = (maxRow.max_sort ?? -1) + 1;
+
+  db.prepare('INSERT INTO folders (id, name, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?)')
+    .run(id, name, sortOrder, now, now);
+
+  return { id, name, sortOrder, createdAt: now, updatedAt: now };
+}
+
+/** Renames a folder and bumps its `updated_at` timestamp. */
+export function renameFolder(id: string, name: string): void {
+  db.prepare('UPDATE folders SET name = ?, updated_at = ? WHERE id = ?')
+    .run(name, Date.now(), id);
+}
+
+/**
+ * Deletes a folder and moves its conversations to uncategorized. Uses a
+ * transaction to ensure atomicity.
+ */
+export function deleteFolder(id: string): void {
+  const deleteFolderTx = db.transaction(() => {
+    db.prepare('UPDATE conversations SET folder_id = NULL WHERE folder_id = ?').run(id);
+    db.prepare('DELETE FROM folders WHERE id = ?').run(id);
+  });
+  deleteFolderTx();
+}
+
+/** Moves a conversation into a folder, or removes it from any folder when `folderId` is null. Clears sort_order so it falls back to default ordering in the new group. */
+export function moveConversationToFolder(conversationId: string, folderId: string | null): void {
+  db.prepare('UPDATE conversations SET folder_id = ?, sort_order = NULL WHERE id = ?')
+    .run(folderId, conversationId);
+}
+
+/** Batch-updates sort_order for multiple conversations in a single transaction. */
+export function reorderConversations(items: Array<{ id: string; sortOrder: number }>): void {
+  const reorderTx = db.transaction(() => {
+    const stmt = db.prepare('UPDATE conversations SET sort_order = ? WHERE id = ?');
+    for (const item of items) {
+      stmt.run(item.sortOrder, item.id);
+    }
+  });
+  reorderTx();
 }
