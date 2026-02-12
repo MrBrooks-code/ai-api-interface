@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 import ChatView from './components/ChatView';
+import ArtifactPanel from './components/ArtifactPanel';
 import SettingsPanel from './components/SettingsPanel';
 import { useChatStore } from './stores/chat-store';
 import { ipc } from './lib/ipc-client';
@@ -143,6 +144,7 @@ export default function App() {
           <main className="flex-1 flex flex-col min-w-0">
             <ChatView />
           </main>
+          <ArtifactPanel />
         </div>
 
         {showSettings && <SettingsPanel />}

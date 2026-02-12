@@ -84,6 +84,20 @@ interface ChatState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
 
+  // Preview panel
+  previewPanel: {
+    visible: boolean;
+    content: string;
+    language: 'html' | 'svg' | 'mermaid' | 'markdown' | 'csv' | 'latex';
+    title: string;
+  } | null;
+  /** Incremented to signal ArtifactPanel should run its animated close. */
+  previewCloseRequest: number;
+  setPreviewPanel: (panel: ChatState['previewPanel']) => void;
+  closePreviewPanel: () => void;
+  /** Triggers the animated close sequence in ArtifactPanel. */
+  requestClosePreview: () => void;
+
   // Settings panel
   showSettings: boolean;
   setShowSettings: (show: boolean) => void;
@@ -110,7 +124,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   conversations: [],
   activeConversationId: null,
   setConversations: (conversations) => set({ conversations }),
-  setActiveConversation: (id) => set({ activeConversationId: id }),
+  setActiveConversation: (id) => set({ activeConversationId: id, previewPanel: null }),
   addConversation: (convo) =>
     set((state) => ({ conversations: [convo, ...state.conversations] })),
   removeConversation: (id) =>
@@ -119,6 +133,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       archivedConversations: state.archivedConversations.filter((c) => c.id !== id),
       activeConversationId: state.activeConversationId === id ? null : state.activeConversationId,
       messages: state.activeConversationId === id ? [] : state.messages,
+      previewPanel: state.activeConversationId === id ? null : state.previewPanel,
     })),
   updateConversationTitle: (id, title) =>
     set((state) => ({
@@ -146,6 +161,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         archivedConversations: [archived, ...state.archivedConversations],
         activeConversationId: state.activeConversationId === id ? null : state.activeConversationId,
         messages: state.activeConversationId === id ? [] : state.messages,
+        previewPanel: state.activeConversationId === id ? null : state.previewPanel,
       };
     }),
   unarchiveConversation: (id) =>
@@ -307,6 +323,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sidebarCollapsed: false,
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+
+  // Preview panel
+  previewPanel: null,
+  previewCloseRequest: 0,
+  setPreviewPanel: (panel) => set({ previewPanel: panel }),
+  closePreviewPanel: () => set({ previewPanel: null }),
+  requestClosePreview: () => set((state) => ({ previewCloseRequest: state.previewCloseRequest + 1 })),
 
   // Settings panel
   showSettings: false,

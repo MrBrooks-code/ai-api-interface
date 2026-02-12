@@ -77,10 +77,8 @@ Clicking the ✕ button or pressing `Cmd/Ctrl+Shift+Backspace` now shows a theme
 
 ---
 
-#### B4. Markdown / Text Export Panel
-**Gap:** ChatGPT Canvas and Claude Artifacts provide a side panel for long-form content. We render everything inline.
-
-**Proposal (lighter version):** When the assistant produces a fenced code block or a long markdown document, add a "Pop out" button that opens it in a resizable side panel with copy/download actions. Not a full editor — just a better reading/copying experience for large outputs.
+#### B4. Markdown / Text Export Panel — Done
+Subsumed by C1 (Artifacts / Preview Panel). The preview panel supports markdown, HTML, SVG, Mermaid, CSV, and LaTeX with copy/download actions.
 
 ---
 
@@ -98,22 +96,15 @@ Clicking the ✕ button or pressing `Cmd/Ctrl+Shift+Backspace` now shows a theme
 
 ---
 
-#### B7. LaTeX / Math Rendering
-**Gap:** Both Claude and ChatGPT render LaTeX equations. Our markdown renderer doesn't handle `$...$` or `$$...$$` blocks.
-
-**Proposal:** Add KaTeX integration to MarkdownRenderer. Renders inline `$...$` and block `$$...$$` math expressions.
+#### B7. LaTeX / Math Rendering — Done
+Added KaTeX-powered LaTeX preview via the Artifacts panel. Fenced `latex` / `tex` / `katex` code blocks show a "Preview" button that renders the math in a sandboxed iframe side panel.
 
 ---
 
 ### C. Larger Efforts (High impact, more work)
 
-#### C1. Artifacts / Preview Panel
-**Gap:** Claude's Artifacts panel renders live HTML/CSS/JS, React components, SVGs, and Mermaid diagrams in a side panel. ChatGPT's Canvas is a full editing workspace. We have nothing comparable.
-
-**Proposal (phased):**
-1. **Phase 1:** Side panel that renders HTML artifacts. When the model produces a fenced `html` block, offer a "Preview" button that opens it in a sandboxed iframe panel.
-2. **Phase 2:** Add Mermaid diagram rendering and SVG preview.
-3. **Phase 3:** React component rendering (if demand warrants).
+#### C1. Artifacts / Preview Panel — Done
+Added a resizable side panel that previews six content types from fenced code blocks: HTML (live with JS), SVG (centered), Mermaid diagrams (rendered to SVG via mermaid.js with theme-aware light/dark), Markdown (rendered to styled HTML), CSV (rendered as a formatted table), and LaTeX (rendered via KaTeX). The panel slides open/closed with animation, supports drag-to-resize, copy-to-clipboard, download with correct file extension, and Escape-to-close. All content is sandboxed in an iframe with `sandbox="allow-scripts"`. The Preview button toggles the panel open and closed.
 
 ---
 
@@ -189,11 +180,11 @@ Based on effort-to-impact ratio and what would make the biggest day-to-day diffe
 | 6 | B3. Message edit / regenerate | Medium | High — both competitors have this |
 | 7 | A5. Export conversation | Small | Medium — compliance teams want this |
 | 8 | B1. Conversation folders | Medium | High — organization at scale |
-| 9 | B7. LaTeX rendering | Small-Med | Medium — important for technical users |
+| ~~9~~ | ~~B7. LaTeX rendering~~ | ~~Small-Med~~ | ~~Done~~ |
 | 10 | C7. Multi-model switching | Medium | High — Bedrock's key advantage is model choice |
-| 11 | B4. Pop-out preview panel | Medium | Medium — better UX for long outputs |
+| ~~11~~ | ~~B4. Pop-out preview panel~~ | ~~Medium~~ | ~~Done (via C1)~~ |
 | 12 | C6. Deep research mode | Medium-Large | High — differentiator |
-| 13 | C1. Artifacts / preview | Large | High — but large scope |
+| ~~13~~ | ~~C1. Artifacts / preview~~ | ~~Large~~ | ~~Done~~ |
 | 14 | C5. Extended thinking | Medium | Medium — model-dependent |
 | 15 | C3. Screenshot capture | Medium | Medium — nice to have |
 | 16 | C2. Voice input | Medium | Low-Med — niche usage |
