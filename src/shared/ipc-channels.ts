@@ -38,6 +38,7 @@ export const IPC = {
   // File operations
   FILE_OPEN_DIALOG: 'file:open-dialog',
   FILE_READ: 'file:read',
+  FILE_EXPORT_CONVERSATION: 'file:export-conversation',
 
   // Conversation persistence
   STORE_LIST_CONVERSATIONS: 'store:list-conversations',

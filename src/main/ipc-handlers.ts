@@ -30,6 +30,7 @@ import { resetBedrockClient, listAvailableModels, setModelId, getModelId } from 
 import { sendMessage, abortStream } from './bedrock-stream';
 import { executeTool } from './tool-executor';
 import { openFileDialog, readFile } from './file-handler';
+import { exportConversation } from './file-export';
 import { getAdminConfig } from './admin-config';
 import {
   listConversations,
@@ -253,6 +254,13 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC.FILE_OPEN_DIALOG, async () => {
     return openFileDialog();
+  });
+
+  ipcMain.handle(IPC.FILE_EXPORT_CONVERSATION, async (_event, conversationId: string) => {
+    if (!checkRateLimit('file:export', 10, 10_000)) {
+      return { success: false, error: 'Rate limit exceeded' };
+    }
+    return exportConversation(conversationId);
   });
 
   ipcMain.handle(IPC.FILE_READ, async (_event, filePath: string) => {

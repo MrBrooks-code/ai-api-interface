@@ -34,6 +34,10 @@ export default function Sidebar() {
   // Inline delete-confirmation state
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
+  // Context menu state — tracks which conversation's "⋯" menu is open
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   /** Commits the rename if the title changed and is non-empty, then exits edit mode. */
   const commitRename = useCallback(() => {
     if (editingId) {
@@ -128,6 +132,25 @@ export default function Sidebar() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [confirmingDeleteId]);
+
+  // Close the context menu on outside click or Escape
+  useEffect(() => {
+    if (!menuOpenId) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpenId(null);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [menuOpenId]);
 
   const confirmingConversation = confirmingDeleteId
     ? conversations.find((c) => c.id === confirmingDeleteId) ?? null
@@ -233,22 +256,52 @@ export default function Sidebar() {
             ) : (
               <span className="flex-1 truncate text-sm">{convo.title}</span>
             )}
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                setConfirmingDeleteId(convo.id);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+            {/* Context menu trigger */}
+            <span className="relative" ref={menuOpenId === convo.id ? menuRef : undefined}>
+              <span
+                role="button"
+                tabIndex={0}
+                title="Conversation options"
+                onClick={(e) => {
                   e.stopPropagation();
-                  setConfirmingDeleteId(convo.id);
-                }
-              }}
-              className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-text-dim hover:text-accent-red transition-opacity text-xs px-1"
-            >
-              ✕
+                  setMenuOpenId(menuOpenId === convo.id ? null : convo.id);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    setMenuOpenId(menuOpenId === convo.id ? null : convo.id);
+                  }
+                }}
+                className={`${menuOpenId === convo.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} text-text-dim hover:text-text transition-opacity text-xs px-1`}
+              >
+                ⋯
+              </span>
+              {menuOpenId === convo.id && (
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded-lg border border-surface-lighter bg-surface shadow-lg py-1">
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-primary/10 hover:text-text transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenId(null);
+                      ipc.exportConversation(convo.id);
+                    }}
+                  >
+                    Export Chat
+                  </button>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-accent-red/10 hover:text-accent-red transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenId(null);
+                      setConfirmingDeleteId(convo.id);
+                    }}
+                  >
+                    Delete Chat
+                  </button>
+                </div>
+              )}
             </span>
           </button>
         ))}

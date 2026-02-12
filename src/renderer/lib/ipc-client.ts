@@ -46,6 +46,7 @@ export const ipc = {
   // Files
   openFileDialog: () => getAPI().openFileDialog(),
   readFile: (filePath: string) => getAPI().readFile(filePath),
+  exportConversation: (conversationId: string) => getAPI().exportConversation(conversationId),
 
   // Store
   listConversations: () => getAPI().listConversations(),

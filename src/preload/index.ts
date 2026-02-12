@@ -98,6 +98,9 @@ const electronAPI = {
   readFile: (filePath: string): Promise<UploadedFile> =>
     ipcRenderer.invoke(IPC.FILE_READ, filePath),
 
+  exportConversation: (conversationId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke(IPC.FILE_EXPORT_CONVERSATION, conversationId),
+
   // --- Conversation Store ---
   listConversations: (): Promise<Conversation[]> =>
     ipcRenderer.invoke(IPC.STORE_LIST_CONVERSATIONS),
