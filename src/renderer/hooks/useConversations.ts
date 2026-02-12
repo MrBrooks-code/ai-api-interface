@@ -19,6 +19,11 @@ export function useConversations() {
     store.setConversations(convos);
   }, []);
 
+  const loadArchivedConversations = useCallback(async () => {
+    const convos = await ipc.listArchivedConversations();
+    store.setArchivedConversations(convos);
+  }, []);
+
   const loadMessages = useCallback(async (conversationId: string) => {
     store.setMessagesLoading(true);
     const messages = await ipc.getMessages(conversationId);
@@ -42,18 +47,34 @@ export function useConversations() {
     store.updateConversationTitle(id, newTitle);
   }, []);
 
+  const archiveConversation = useCallback(async (id: string) => {
+    await ipc.archiveConversation(id);
+    store.archiveConversation(id);
+  }, []);
+
+  const unarchiveConversation = useCallback(async (id: string) => {
+    await ipc.unarchiveConversation(id);
+    store.unarchiveConversation(id);
+  }, []);
+
   // Load conversations on mount
   useEffect(() => {
     loadConversations();
-  }, [loadConversations]);
+    loadArchivedConversations();
+  }, [loadConversations, loadArchivedConversations]);
 
   return {
     conversations: store.conversations,
     activeConversationId: store.activeConversationId,
+    archivedConversations: store.archivedConversations,
+    archiveSectionExpanded: store.archiveSectionExpanded,
+    toggleArchiveSection: store.toggleArchiveSection,
     loadConversations,
     loadMessages,
     createConversation,
     deleteConversation,
     renameConversation,
+    archiveConversation,
+    unarchiveConversation,
   };
 }

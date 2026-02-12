@@ -117,8 +117,17 @@ const electronAPI = {
   updateConversationTitle: (id: string, title: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC.STORE_UPDATE_CONVERSATION_TITLE, id, title),
 
-  searchConversations: (query: string): Promise<Conversation[]> =>
-    ipcRenderer.invoke(IPC.STORE_SEARCH_CONVERSATIONS, query),
+  searchConversations: (query: string, includeArchived?: boolean): Promise<Conversation[]> =>
+    ipcRenderer.invoke(IPC.STORE_SEARCH_CONVERSATIONS, query, includeArchived),
+
+  archiveConversation: (id: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC.STORE_ARCHIVE_CONVERSATION, id),
+
+  unarchiveConversation: (id: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke(IPC.STORE_UNARCHIVE_CONVERSATION, id),
+
+  listArchivedConversations: (): Promise<Conversation[]> =>
+    ipcRenderer.invoke(IPC.STORE_LIST_ARCHIVED_CONVERSATIONS),
 
   saveMessage: (message: ChatMessage): Promise<{ success: boolean }> =>
     ipcRenderer.invoke(IPC.STORE_SAVE_MESSAGE, message),

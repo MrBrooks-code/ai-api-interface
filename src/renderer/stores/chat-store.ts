@@ -30,6 +30,14 @@ interface ChatState {
   removeConversation: (id: string) => void;
   updateConversationTitle: (id: string, title: string) => void;
 
+  // Archive
+  archivedConversations: Conversation[];
+  archiveSectionExpanded: boolean;
+  setArchivedConversations: (convos: Conversation[]) => void;
+  toggleArchiveSection: () => void;
+  archiveConversation: (id: string) => void;
+  unarchiveConversation: (id: string) => void;
+
   // Messages
   messages: ChatMessage[];
   setMessages: (messages: ChatMessage[]) => void;
@@ -108,6 +116,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   removeConversation: (id) =>
     set((state) => ({
       conversations: state.conversations.filter((c) => c.id !== id),
+      archivedConversations: state.archivedConversations.filter((c) => c.id !== id),
       activeConversationId: state.activeConversationId === id ? null : state.activeConversationId,
       messages: state.activeConversationId === id ? [] : state.messages,
     })),
@@ -116,7 +125,39 @@ export const useChatStore = create<ChatState>((set, get) => ({
       conversations: state.conversations.map((c) =>
         c.id === id ? { ...c, title, updatedAt: Date.now() } : c
       ),
+      archivedConversations: state.archivedConversations.map((c) =>
+        c.id === id ? { ...c, title, updatedAt: Date.now() } : c
+      ),
     })),
+
+  // Archive
+  archivedConversations: [],
+  archiveSectionExpanded: false,
+  setArchivedConversations: (convos) => set({ archivedConversations: convos }),
+  toggleArchiveSection: () =>
+    set((state) => ({ archiveSectionExpanded: !state.archiveSectionExpanded })),
+  archiveConversation: (id) =>
+    set((state) => {
+      const convo = state.conversations.find((c) => c.id === id);
+      if (!convo) return state;
+      const archived = { ...convo, archivedAt: Date.now() };
+      return {
+        conversations: state.conversations.filter((c) => c.id !== id),
+        archivedConversations: [archived, ...state.archivedConversations],
+        activeConversationId: state.activeConversationId === id ? null : state.activeConversationId,
+        messages: state.activeConversationId === id ? [] : state.messages,
+      };
+    }),
+  unarchiveConversation: (id) =>
+    set((state) => {
+      const convo = state.archivedConversations.find((c) => c.id === id);
+      if (!convo) return state;
+      const restored = { ...convo, archivedAt: undefined, updatedAt: Date.now() };
+      return {
+        archivedConversations: state.archivedConversations.filter((c) => c.id !== id),
+        conversations: [restored, ...state.conversations],
+      };
+    }),
 
   // Messages
   messages: [],

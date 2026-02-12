@@ -39,6 +39,9 @@ import {
   deleteConversation,
   updateConversationTitle,
   searchConversations,
+  archiveConversation,
+  unarchiveConversation,
+  listArchivedConversations,
   saveMessage,
   getMessages,
   listSsoConfigs,
@@ -308,8 +311,28 @@ export function registerIpcHandlers() {
     return { success: true };
   });
 
-  ipcMain.handle(IPC.STORE_SEARCH_CONVERSATIONS, (_event, query: string) => {
-    return searchConversations(query);
+  ipcMain.handle(IPC.STORE_SEARCH_CONVERSATIONS, (_event, query: string, includeArchived?: boolean) => {
+    return searchConversations(query, includeArchived ?? false);
+  });
+
+  ipcMain.handle(IPC.STORE_ARCHIVE_CONVERSATION, (_event, id: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
+    archiveConversation(id);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.STORE_UNARCHIVE_CONVERSATION, (_event, id: string) => {
+    if (!checkRateLimit('store:write', 30, 10_000)) {
+      return { error: 'Rate limit exceeded — please slow down' };
+    }
+    unarchiveConversation(id);
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC.STORE_LIST_ARCHIVED_CONVERSATIONS, () => {
+    return listArchivedConversations();
   });
 
   ipcMain.handle(IPC.STORE_SAVE_MESSAGE, (_event, message) => {

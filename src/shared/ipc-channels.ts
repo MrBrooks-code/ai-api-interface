@@ -49,6 +49,9 @@ export const IPC = {
   STORE_GET_MESSAGES: 'store:get-messages',
   STORE_UPDATE_CONVERSATION_TITLE: 'store:update-conversation-title',
   STORE_SEARCH_CONVERSATIONS: 'store:search-conversations',
+  STORE_ARCHIVE_CONVERSATION: 'store:archive-conversation',
+  STORE_UNARCHIVE_CONVERSATION: 'store:unarchive-conversation',
+  STORE_LIST_ARCHIVED_CONVERSATIONS: 'store:list-archived-conversations',
 
   // Admin config
   ADMIN_CONFIG_GET: 'admin:get-config',

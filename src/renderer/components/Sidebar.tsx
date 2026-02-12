@@ -14,10 +14,115 @@ const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
 const DEFAULT_WIDTH = 256;
 
+/** Props for an individual conversation row in the sidebar. */
+interface ConversationRowProps {
+  convo: Conversation;
+  isArchived: boolean;
+  isActive: boolean;
+  editingId: string | null;
+  editingTitle: string;
+  editInputRef: React.Ref<HTMLInputElement>;
+  menuOpenId: string | null;
+  menuRef: React.Ref<HTMLSpanElement>;
+  onSelect: () => void;
+  onDoubleClick: () => void;
+  onEditChange: (value: string) => void;
+  onEditCommit: () => void;
+  onEditCancel: () => void;
+  onMenuToggle: () => void;
+  onExport: () => void;
+  onArchiveToggle: () => void;
+  onDelete: () => void;
+}
+
+/** A single conversation row with inline rename, context menu, and archive support. */
+function ConversationRow({
+  convo, isArchived, isActive, editingId, editingTitle, editInputRef,
+  menuOpenId, menuRef, onSelect, onDoubleClick, onEditChange, onEditCommit,
+  onEditCancel, onMenuToggle, onExport, onArchiveToggle, onDelete,
+}: ConversationRowProps) {
+  const isEditing = editingId === convo.id;
+  const isMenuOpen = menuOpenId === convo.id;
+
+  return (
+    <button
+      type="button"
+      className={`group flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors w-full text-left ${
+        isActive
+          ? 'bg-surface-lighter text-text'
+          : 'text-text-muted hover:bg-primary/10 hover:text-text'
+      }`}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+      onDoubleClick={onDoubleClick}
+    >
+      {isEditing ? (
+        <input
+          ref={editInputRef}
+          type="text"
+          value={editingTitle}
+          onChange={(e) => onEditChange(e.target.value)}
+          onBlur={onEditCommit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); onEditCommit(); }
+            else if (e.key === 'Escape') { e.preventDefault(); onEditCancel(); }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className={`flex-1 min-w-0 text-sm bg-transparent border-b border-primary outline-none text-text ${isArchived ? 'opacity-60' : ''}`}
+        />
+      ) : (
+        <span className={`flex-1 truncate text-sm ${isArchived ? 'opacity-60' : ''}`}>{convo.title}</span>
+      )}
+      {/* Context menu trigger */}
+      <span className="relative" ref={isMenuOpen ? menuRef : undefined}>
+        <span
+          role="button"
+          tabIndex={0}
+          title="Conversation options"
+          onClick={(e) => { e.stopPropagation(); onMenuToggle(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onMenuToggle(); }
+          }}
+          className={`${isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} text-text-dim hover:text-text transition-opacity text-xs px-1`}
+        >
+          ⋯
+        </span>
+        {isMenuOpen && (
+          <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded-lg border border-surface-lighter bg-surface shadow-lg py-1">
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-primary/10 hover:text-text transition-colors"
+              onClick={(e) => { e.stopPropagation(); onExport(); }}
+            >
+              Export Chat
+            </button>
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-primary/10 hover:text-text transition-colors"
+              onClick={(e) => { e.stopPropagation(); onArchiveToggle(); }}
+            >
+              {isArchived ? 'Unarchive Chat' : 'Archive Chat'}
+            </button>
+            <button
+              type="button"
+              className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-accent-red/10 hover:text-accent-red transition-colors"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            >
+              Delete Chat
+            </button>
+          </div>
+        )}
+      </span>
+    </button>
+  );
+}
+
 /** Navigation sidebar with conversation history and connection status. */
 export default function Sidebar() {
-  const { conversations, activeConversationId, loadMessages, createConversation, deleteConversation, renameConversation } =
-    useConversations();
+  const {
+    conversations, activeConversationId, loadMessages, createConversation,
+    deleteConversation, renameConversation, archiveConversation, unarchiveConversation,
+    archivedConversations, archiveSectionExpanded, toggleArchiveSection,
+  } = useConversations();
   const connectionStatus = useChatStore((s) => s.connectionStatus);
   const draftTitle = useChatStore((s) => s.draftTitle);
   const setShowSettings = useChatStore((s) => s.setShowSettings);
@@ -42,13 +147,14 @@ export default function Sidebar() {
   const commitRename = useCallback(() => {
     if (editingId) {
       const trimmed = editingTitle.trim();
-      if (trimmed && trimmed !== conversations.find((c) => c.id === editingId)?.title) {
+      const existing = conversations.find((c) => c.id === editingId) ?? archivedConversations.find((c) => c.id === editingId);
+      if (trimmed && trimmed !== existing?.title) {
         renameConversation(editingId, trimmed);
       }
     }
     setEditingId(null);
     setEditingTitle('');
-  }, [editingId, editingTitle, conversations, renameConversation]);
+  }, [editingId, editingTitle, conversations, archivedConversations, renameConversation]);
 
   /** Cancels the inline rename without saving. */
   const cancelRename = useCallback(() => {
@@ -103,12 +209,12 @@ export default function Sidebar() {
     }
 
     debounceRef.current = setTimeout(async () => {
-      const results = await ipc.searchConversations(searchQuery.trim());
+      const results = await ipc.searchConversations(searchQuery.trim(), archiveSectionExpanded);
       setSearchResults(results);
     }, 250);
 
     return () => clearTimeout(debounceRef.current);
-  }, [searchQuery]);
+  }, [searchQuery, archiveSectionExpanded]);
 
   /** Show the delete confirmation dialog when the keyboard shortcut fires. */
   useEffect(() => {
@@ -153,7 +259,9 @@ export default function Sidebar() {
   }, [menuOpenId]);
 
   const confirmingConversation = confirmingDeleteId
-    ? conversations.find((c) => c.id === confirmingDeleteId) ?? null
+    ? conversations.find((c) => c.id === confirmingDeleteId)
+      ?? archivedConversations.find((c) => c.id === confirmingDeleteId)
+      ?? null
     : null;
 
   /** Focus the search input when the global Cmd/Ctrl+K shortcut fires. */
@@ -173,7 +281,13 @@ export default function Sidebar() {
     return () => window.removeEventListener('focus-search-input', handler);
   }, []);
 
-  const displayedConversations = searchResults ?? conversations;
+  // When searching, split results by archive status for display in the two sections
+  const displayedConversations = searchResults
+    ? searchResults.filter((c) => !c.archivedAt)
+    : conversations;
+  const displayedArchived = searchResults
+    ? searchResults.filter((c) => !!c.archivedAt)
+    : archivedConversations;
 
   return (
     <aside
@@ -190,7 +304,7 @@ export default function Sidebar() {
       </div>
 
       {/* Search filter */}
-      {conversations.length > 0 && (
+      {(conversations.length > 0 || archivedConversations.length > 0) && (
         <div className="px-3 pb-2">
           <input
             ref={searchInputRef}
@@ -217,105 +331,74 @@ export default function Sidebar() {
         )}
 
         {displayedConversations.map((convo) => (
-          <button
+          <ConversationRow
             key={convo.id}
-            type="button"
-            className={`group flex items-center gap-1 px-3 py-2 rounded-lg cursor-pointer mb-0.5 transition-colors w-full text-left ${
-              convo.id === activeConversationId
-                ? 'bg-surface-lighter text-text'
-                : 'text-text-muted hover:bg-primary/10 hover:text-text'
-            }`}
-            onClick={() => {
-              if (editingId !== convo.id) loadMessages(convo.id);
-            }}
-            onDoubleClick={() => {
-              setConfirmingDeleteId(null);
-              setEditingId(convo.id);
-              setEditingTitle(convo.title);
-            }}
-          >
-            {editingId === convo.id ? (
-              <input
-                ref={editInputRef}
-                type="text"
-                value={editingTitle}
-                onChange={(e) => setEditingTitle(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    commitRename();
-                  } else if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancelRename();
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="flex-1 min-w-0 text-sm bg-transparent border-b border-primary outline-none text-text"
-              />
-            ) : (
-              <span className="flex-1 truncate text-sm">{convo.title}</span>
-            )}
-            {/* Context menu trigger */}
-            <span className="relative" ref={menuOpenId === convo.id ? menuRef : undefined}>
-              <span
-                role="button"
-                tabIndex={0}
-                title="Conversation options"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpenId(menuOpenId === convo.id ? null : convo.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.stopPropagation();
-                    setMenuOpenId(menuOpenId === convo.id ? null : convo.id);
-                  }
-                }}
-                className={`${menuOpenId === convo.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} text-text-dim hover:text-text transition-opacity text-xs px-1`}
-              >
-                ⋯
-              </span>
-              {menuOpenId === convo.id && (
-                <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] rounded-lg border border-surface-lighter bg-surface shadow-lg py-1">
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-primary/10 hover:text-text transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpenId(null);
-                      ipc.exportConversation(convo.id);
-                    }}
-                  >
-                    Export Chat
-                  </button>
-                  <button
-                    type="button"
-                    className="w-full text-left px-3 py-1.5 text-sm text-text-muted hover:bg-accent-red/10 hover:text-accent-red transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpenId(null);
-                      setConfirmingDeleteId(convo.id);
-                    }}
-                  >
-                    Delete Chat
-                  </button>
-                </div>
-              )}
-            </span>
-          </button>
+            convo={convo}
+            isArchived={false}
+            isActive={convo.id === activeConversationId}
+            editingId={editingId}
+            editingTitle={editingTitle}
+            editInputRef={editInputRef}
+            menuOpenId={menuOpenId}
+            menuRef={menuRef}
+            onSelect={() => { if (editingId !== convo.id) loadMessages(convo.id); }}
+            onDoubleClick={() => { setConfirmingDeleteId(null); setEditingId(convo.id); setEditingTitle(convo.title); }}
+            onEditChange={(v) => setEditingTitle(v)}
+            onEditCommit={commitRename}
+            onEditCancel={cancelRename}
+            onMenuToggle={() => setMenuOpenId(menuOpenId === convo.id ? null : convo.id)}
+            onExport={() => { setMenuOpenId(null); ipc.exportConversation(convo.id); }}
+            onArchiveToggle={() => { setMenuOpenId(null); archiveConversation(convo.id); }}
+            onDelete={() => { setMenuOpenId(null); setConfirmingDeleteId(convo.id); }}
+          />
         ))}
 
-        {conversations.length === 0 && (
+        {conversations.length === 0 && archivedConversations.length === 0 && (
           <p className="text-text-dim text-xs text-center mt-8 px-4">
             No conversations yet. Start a new chat!
           </p>
         )}
 
-        {conversations.length > 0 && displayedConversations.length === 0 && (
+        {(conversations.length > 0 || archivedConversations.length > 0) && displayedConversations.length === 0 && displayedArchived.length === 0 && (
           <p className="text-text-dim text-xs text-center mt-8 px-4">
             No matching conversations
           </p>
+        )}
+
+        {/* Collapsible archived section */}
+        {displayedArchived.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={toggleArchiveSection}
+              className="w-full flex items-center gap-1.5 px-3 py-2 mt-2 text-xs text-text-dim hover:text-text-muted transition-colors"
+            >
+              <span className="text-[10px]">{archiveSectionExpanded ? '\u25BC' : '\u25B6'}</span>
+              Archived ({displayedArchived.length})
+            </button>
+            {archiveSectionExpanded && displayedArchived.map((convo) => (
+              <ConversationRow
+                key={convo.id}
+                convo={convo}
+                isArchived={true}
+                isActive={convo.id === activeConversationId}
+                editingId={editingId}
+                editingTitle={editingTitle}
+                editInputRef={editInputRef}
+                menuOpenId={menuOpenId}
+                menuRef={menuRef}
+                onSelect={() => { if (editingId !== convo.id) loadMessages(convo.id); }}
+                onDoubleClick={() => { setConfirmingDeleteId(null); setEditingId(convo.id); setEditingTitle(convo.title); }}
+                onEditChange={(v) => setEditingTitle(v)}
+                onEditCommit={commitRename}
+                onEditCancel={cancelRename}
+                onMenuToggle={() => setMenuOpenId(menuOpenId === convo.id ? null : convo.id)}
+                onExport={() => { setMenuOpenId(null); ipc.exportConversation(convo.id); }}
+                onArchiveToggle={() => { setMenuOpenId(null); unarchiveConversation(convo.id); }}
+                onDelete={() => { setMenuOpenId(null); setConfirmingDeleteId(convo.id); }}
+              />
+            ))}
+          </>
         )}
       </div>
 

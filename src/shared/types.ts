@@ -137,6 +137,8 @@ export interface Conversation {
   title: string;
   createdAt: number;
   updatedAt: number;
+  /** Unix ms timestamp when archived, or undefined if active. */
+  archivedAt?: number;
 }
 
 // --- Stream Events ---

@@ -59,27 +59,35 @@ export function initStore() {
       updated_at INTEGER NOT NULL
     );
   `);
+
+  // Idempotent migration: add archived_at column for conversation archiving.
+  try {
+    db.exec('ALTER TABLE conversations ADD COLUMN archived_at INTEGER DEFAULT NULL');
+  } catch {
+    // Column already exists on subsequent launches.
+  }
 }
 
-/** Returns all conversations, most recently updated first. */
+/** Returns all active (non-archived) conversations, most recently updated first. */
 export function listConversations(): Conversation[] {
   const rows = db
-    .prepare('SELECT id, title, created_at, updated_at FROM conversations ORDER BY updated_at DESC')
-    .all() as Array<{ id: string; title: string; created_at: number; updated_at: number }>;
+    .prepare('SELECT id, title, created_at, updated_at, archived_at FROM conversations WHERE archived_at IS NULL ORDER BY updated_at DESC')
+    .all() as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null }>;
 
   return rows.map((r) => ({
     id: r.id,
     title: r.title,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    archivedAt: r.archived_at ?? undefined,
   }));
 }
 
 /** Returns a single conversation by ID, or `null` if not found. */
 export function getConversation(id: string): Conversation | null {
   const row = db
-    .prepare('SELECT id, title, created_at, updated_at FROM conversations WHERE id = ?')
-    .get(id) as { id: string; title: string; created_at: number; updated_at: number } | undefined;
+    .prepare('SELECT id, title, created_at, updated_at, archived_at FROM conversations WHERE id = ?')
+    .get(id) as { id: string; title: string; created_at: number; updated_at: number; archived_at: number | null } | undefined;
 
   if (!row) return null;
   return {
@@ -87,6 +95,7 @@ export function getConversation(id: string): Conversation | null {
     title: row.title,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    archivedAt: row.archived_at ?? undefined,
   };
 }
 
@@ -108,6 +117,34 @@ export function deleteConversation(id: string): void {
 export function updateConversationTitle(id: string, title: string): void {
   db.prepare('UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?')
     .run(title, Date.now(), id);
+}
+
+/** Marks a conversation as archived by setting `archived_at` to the current timestamp. */
+export function archiveConversation(id: string): void {
+  db.prepare('UPDATE conversations SET archived_at = ? WHERE id = ?')
+    .run(Date.now(), id);
+}
+
+/** Restores an archived conversation and bumps `updated_at` so it surfaces near the top. */
+export function unarchiveConversation(id: string): void {
+  const now = Date.now();
+  db.prepare('UPDATE conversations SET archived_at = NULL, updated_at = ? WHERE id = ?')
+    .run(now, id);
+}
+
+/** Returns all archived conversations, most recently archived first. */
+export function listArchivedConversations(): Conversation[] {
+  const rows = db
+    .prepare('SELECT id, title, created_at, updated_at, archived_at FROM conversations WHERE archived_at IS NOT NULL ORDER BY archived_at DESC')
+    .all() as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null }>;
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    archivedAt: r.archived_at ?? undefined,
+  }));
 }
 
 /**
@@ -137,26 +174,28 @@ export function saveMessage(message: ChatMessage): void {
 }
 
 /**
- * Searches conversations by title or message text content. Returns conversations
- * where the query matches the title or any text block inside a message.
+ * Searches conversations by title or message text content. When
+ * `includeArchived` is false (default), only active conversations are returned.
  */
-export function searchConversations(query: string): Conversation[] {
+export function searchConversations(query: string, includeArchived = false): Conversation[] {
   const pattern = `%${query}%`;
+  const archiveFilter = includeArchived ? '' : 'AND c.archived_at IS NULL';
   const rows = db
     .prepare(
-      `SELECT DISTINCT c.id, c.title, c.created_at, c.updated_at
+      `SELECT DISTINCT c.id, c.title, c.created_at, c.updated_at, c.archived_at
        FROM conversations c
        LEFT JOIN messages m ON m.conversation_id = c.id
-       WHERE c.title LIKE ? OR m.content LIKE ?
+       WHERE (c.title LIKE ? OR m.content LIKE ?) ${archiveFilter}
        ORDER BY c.updated_at DESC`
     )
-    .all(pattern, pattern) as Array<{ id: string; title: string; created_at: number; updated_at: number }>;
+    .all(pattern, pattern) as Array<{ id: string; title: string; created_at: number; updated_at: number; archived_at: number | null }>;
 
   return rows.map((r) => ({
     id: r.id,
     title: r.title,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    archivedAt: r.archived_at ?? undefined,
   }));
 }
 
