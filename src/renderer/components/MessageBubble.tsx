@@ -107,15 +107,10 @@ export default function MessageBubble({ message, isStreaming }: Props) {
     );
   }
 
-  return (
-    <div className={`group/msg relative flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`rounded-2xl px-4 py-3 overflow-hidden ${
-          isUser
-            ? 'max-w-[85%] bg-primary/20 text-text'
-            : 'max-w-full bg-surface-light text-text'
-        }`}
-      >
+  // Assistant messages — render content directly in the centered column, no bubble
+  if (!isUser) {
+    return (
+      <div className="group/msg relative text-text">
         <div className="space-y-2">
           {message.content.map((block, i) => renderBlock(block, i))}
         </div>
@@ -124,19 +119,33 @@ export default function MessageBubble({ message, isStreaming }: Props) {
           <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
         )}
 
-        {/* Timestamp and copy action */}
-        <div className="flex items-center justify-between mt-1">
+        <div className="flex items-center gap-3 mt-2">
           <span className="text-[10px] text-text-dim">
             {formatTime(message.timestamp)}
           </span>
-          {!isUser && (
-            <button
-              onClick={handleCopyMessage}
-              className="text-[10px] text-text-dim opacity-0 group-hover/msg:opacity-60 hover:!opacity-100 transition-opacity ml-3"
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          )}
+          <button
+            onClick={handleCopyMessage}
+            className="text-[10px] text-text-dim opacity-0 group-hover/msg:opacity-60 hover:!opacity-100 transition-opacity"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // User messages — keep in a right-aligned bubble
+  return (
+    <div className="flex justify-end">
+      <div className="rounded-2xl px-4 py-3 max-w-[85%] bg-surface-light text-text overflow-hidden">
+        <div className="space-y-2">
+          {message.content.map((block, i) => renderBlock(block, i))}
+        </div>
+
+        <div className="flex items-center mt-1">
+          <span className="text-[10px] text-text-dim">
+            {formatTime(message.timestamp)}
+          </span>
         </div>
       </div>
     </div>

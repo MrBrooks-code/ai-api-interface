@@ -89,94 +89,92 @@ export default function ToolActivityGroup({ messages, isStreaming }: Props) {
   };
 
   return (
-    <div className="group/msg relative flex justify-start">
-      <div className="max-w-full rounded-2xl px-4 py-3 bg-surface-light text-text overflow-hidden">
-        {/* Collapsible activity summary bar */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-2 w-full text-left"
-        >
-          <span className="text-accent-yellow text-sm">&#9881;&#65039;</span>
-          <span className="text-sm font-medium text-text-muted">
-            {summaryLabel}
-          </span>
-          <span className="text-xs text-text-dim truncate">
-            {toolNames.join(', ')}
-          </span>
-          {!chainComplete && (
-            <span className="flex-shrink-0 inline-block w-1.5 h-1.5 rounded-full bg-accent-yellow animate-pulse" />
-          )}
-          <span className="text-text-dim text-xs ml-auto flex-shrink-0">
-            {expanded ? '\u25BC' : '\u25B6'}
-          </span>
-        </button>
+    <div className="group/msg relative text-text">
+      {/* Thinking indicator while waiting for the final answer */}
+      {showThinking && (
+        <div className="flex items-center gap-1 text-text-muted text-sm">
+          <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
+          <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
+          <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
+          <span className="ml-1.5 italic">Thinking&hellip;</span>
+        </div>
+      )}
 
-        {/* Expanded intermediate steps */}
-        {expanded && (
-          <div className="border-l-2 border-surface-lighter pl-3 mt-2 space-y-1">
-            {activityMessages.map((msg) => (
-              <div key={msg.id} className="space-y-1">
-                {msg.content.map((block, j) => {
-                  if (block.type === 'text' && block.text) {
-                    return (
-                      <p key={j} className="text-xs text-text-muted my-1">
-                        {block.text}
-                      </p>
-                    );
-                  }
-                  if (block.type === 'toolUse') {
-                    return <ToolCallCard key={j} block={block} type="call" />;
-                  }
-                  if (block.type === 'toolResult') {
-                    return <ToolCallCard key={j} block={block} type="result" />;
-                  }
-                  return null;
-                })}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Thinking indicator while waiting for the final answer */}
-        {showThinking && (
-          <div className="flex items-center gap-1 mt-3 text-text-muted text-sm">
-            <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
-            <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
-            <span className="thinking-dot inline-block w-1.5 h-1.5 rounded-full bg-text-muted" />
-            <span className="ml-1.5 italic">Thinking&hellip;</span>
-          </div>
-        )}
-
-        {/* Final answer text */}
-        {finalMsg && hasVisibleText && (
-          <div className="mt-3 space-y-2">
-            {finalMsg.content.map((block, i) =>
-              block.type === 'text' && block.text ? (
-                <MarkdownRenderer key={i} content={block.text} />
-              ) : null,
-            )}
-          </div>
-        )}
-
-        {/* Streaming cursor */}
-        {isStreaming && hasVisibleText && (
-          <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
-        )}
-
-        {/* Timestamp and copy action */}
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-[10px] text-text-dim">
-            {formatTime(lastMsg.timestamp)}
-          </span>
-          {hasVisibleText && (
-            <button
-              onClick={handleCopy}
-              className="text-[10px] text-text-dim opacity-0 group-hover/msg:opacity-60 hover:!opacity-100 transition-opacity ml-3"
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
+      {/* Final answer text */}
+      {finalMsg && hasVisibleText && (
+        <div className="space-y-2">
+          {finalMsg.content.map((block, i) =>
+            block.type === 'text' && block.text ? (
+              <MarkdownRenderer key={i} content={block.text} />
+            ) : null,
           )}
         </div>
+      )}
+
+      {/* Streaming cursor */}
+      {isStreaming && hasVisibleText && (
+        <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-middle" />
+      )}
+
+      {/* Collapsible tool activity summary */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full text-left mt-3"
+      >
+        <span className="text-accent-yellow text-sm">&#9881;&#65039;</span>
+        <span className="text-sm font-medium text-text-muted">
+          {summaryLabel}
+        </span>
+        <span className="text-xs text-text-dim truncate">
+          {toolNames.join(', ')}
+        </span>
+        {!chainComplete && (
+          <span className="flex-shrink-0 inline-block w-1.5 h-1.5 rounded-full bg-accent-yellow animate-pulse" />
+        )}
+        <span className="text-text-dim text-xs ml-auto flex-shrink-0">
+          {expanded ? '\u25BC' : '\u25B6'}
+        </span>
+      </button>
+
+      {/* Expanded intermediate steps */}
+      {expanded && (
+        <div className="border-l-2 border-surface-lighter pl-3 mt-2 space-y-1">
+          {activityMessages.map((msg) => (
+            <div key={msg.id} className="space-y-1">
+              {msg.content.map((block, j) => {
+                if (block.type === 'text' && block.text) {
+                  return (
+                    <p key={j} className="text-xs text-text-muted my-1">
+                      {block.text}
+                    </p>
+                  );
+                }
+                if (block.type === 'toolUse') {
+                  return <ToolCallCard key={j} block={block} type="call" />;
+                }
+                if (block.type === 'toolResult') {
+                  return <ToolCallCard key={j} block={block} type="result" />;
+                }
+                return null;
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Timestamp and copy action */}
+      <div className="flex items-center gap-3 mt-2">
+        <span className="text-[10px] text-text-dim">
+          {formatTime(lastMsg.timestamp)}
+        </span>
+        {hasVisibleText && (
+          <button
+            onClick={handleCopy}
+            className="text-[10px] text-text-dim opacity-0 group-hover/msg:opacity-60 hover:!opacity-100 transition-opacity"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        )}
       </div>
     </div>
   );
