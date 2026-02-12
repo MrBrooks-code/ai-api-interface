@@ -31,6 +31,9 @@ export default function Sidebar() {
   const [editingTitle, setEditingTitle] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  // Inline delete-confirmation state
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+
   /** Commits the rename if the title changed and is non-empty, then exits edit mode. */
   const commitRename = useCallback(() => {
     if (editingId) {
@@ -102,6 +105,33 @@ export default function Sidebar() {
 
     return () => clearTimeout(debounceRef.current);
   }, [searchQuery]);
+
+  /** Show the delete confirmation dialog when the keyboard shortcut fires. */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const conversationId = (e as CustomEvent<{ conversationId: string }>).detail.conversationId;
+      setConfirmingDeleteId(conversationId);
+    };
+    window.addEventListener('request-delete-conversation', handler);
+    return () => window.removeEventListener('request-delete-conversation', handler);
+  }, []);
+
+  /** Cancel delete confirmation on Escape. */
+  useEffect(() => {
+    if (!confirmingDeleteId) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setConfirmingDeleteId(null);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [confirmingDeleteId]);
+
+  const confirmingConversation = confirmingDeleteId
+    ? conversations.find((c) => c.id === confirmingDeleteId) ?? null
+    : null;
 
   /** Focus the search input when the global Cmd/Ctrl+K shortcut fires. */
   useEffect(() => {
@@ -176,6 +206,7 @@ export default function Sidebar() {
               if (editingId !== convo.id) loadMessages(convo.id);
             }}
             onDoubleClick={() => {
+              setConfirmingDeleteId(null);
               setEditingId(convo.id);
               setEditingTitle(convo.title);
             }}
@@ -207,12 +238,12 @@ export default function Sidebar() {
               tabIndex={0}
               onClick={(e) => {
                 e.stopPropagation();
-                deleteConversation(convo.id);
+                setConfirmingDeleteId(convo.id);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.stopPropagation();
-                  deleteConversation(convo.id);
+                  setConfirmingDeleteId(convo.id);
                 }
               }}
               className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-text-dim hover:text-accent-red transition-opacity text-xs px-1"
@@ -258,6 +289,44 @@ export default function Sidebar() {
         onMouseDown={startResize}
         className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
       />
+
+      {/* Delete confirmation modal */}
+      {confirmingConversation && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setConfirmingDeleteId(null)}
+        >
+          <div
+            className="rounded-xl border border-accent-red/30 bg-surface shadow-lg px-6 py-5 space-y-4 max-w-xs w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-semibold text-text">Delete Chat</h3>
+            <p className="text-sm text-text-muted">
+              Are you sure you want to delete &ldquo;{confirmingConversation.title}&rdquo;? This cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setConfirmingDeleteId(null)}
+                className="px-4 py-2 rounded-lg bg-surface-lighter text-text text-sm font-medium hover:bg-surface-light transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = confirmingConversation.id;
+                  setConfirmingDeleteId(null);
+                  deleteConversation(id);
+                }}
+                className="px-4 py-2 rounded-lg bg-accent-red text-surface text-sm font-medium hover:bg-accent-red/90 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
