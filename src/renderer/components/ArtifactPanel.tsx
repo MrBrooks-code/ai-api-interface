@@ -6,7 +6,7 @@
  * iframe) for security. The panel slides open and closed with a width transition.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import katex from 'katex';
 import { useChatStore } from '../stores/chat-store';
@@ -255,6 +255,8 @@ export default function ArtifactPanel() {
   const [mounted, setMounted] = useState(false);
   const isDragging = useRef(false);
   const isClosing = useRef(false);
+  const pendingOpen = useRef(false);
+  const asideRef = useRef<HTMLElement>(null);
   const [srcdoc, setSrcdoc] = useState('');
   const mermaidIdCounter = useRef(0);
 
@@ -263,14 +265,10 @@ export default function ArtifactPanel() {
     if (previewPanel) {
       isClosing.current = false;
       if (!mounted) {
-        // Fresh open: start at 0 width, then animate to target on next frame
+        // Fresh open: mount at width 0, animation triggered by layout effect below
         setAnimatedWidth(0);
         setMounted(true);
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setAnimatedWidth(targetWidth);
-          });
-        });
+        pendingOpen.current = true;
       }
       // If already mounted (swapping content), width stays as-is — no animation needed
     } else if (mounted) {
@@ -280,6 +278,17 @@ export default function ArtifactPanel() {
       isClosing.current = false;
     }
   }, [previewPanel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // After mounting at width 0, force a reflow then set target width so the
+  // CSS transition reliably animates. This replaces the double-rAF approach
+  // which could be collapsed by the browser under load.
+  useLayoutEffect(() => {
+    if (pendingOpen.current && asideRef.current) {
+      pendingOpen.current = false;
+      void asideRef.current.offsetWidth; // force reflow at width 0
+      setAnimatedWidth(targetWidth);
+    }
+  }, [mounted, targetWidth]);
 
   // Animated close: shrink to 0, then unmount after transition
   const handleClose = useCallback(() => {
@@ -395,6 +404,7 @@ export default function ArtifactPanel() {
 
   return (
     <aside
+      ref={asideRef}
       className="relative bg-surface flex flex-col border-l-2 border-text-muted/40 flex-shrink-0 overflow-hidden"
       style={{
         width: animatedWidth,
