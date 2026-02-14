@@ -166,7 +166,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const convo = state.conversations.find((c) => c.id === id);
       if (!convo) return state;
-      const archived = { ...convo, archivedAt: Date.now(), folderId: undefined };
+      const archived = { ...convo, archivedAt: Date.now(), folderId: undefined, sortOrder: undefined };
       return {
         conversations: state.conversations.filter((c) => c.id !== id),
         archivedConversations: [archived, ...state.archivedConversations],
@@ -179,7 +179,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const convo = state.archivedConversations.find((c) => c.id === id);
       if (!convo) return state;
-      const restored = { ...convo, archivedAt: undefined, updatedAt: Date.now() };
+      const restored = { ...convo, archivedAt: undefined, updatedAt: Date.now(), sortOrder: undefined };
       return {
         archivedConversations: state.archivedConversations.filter((c) => c.id !== id),
         conversations: [restored, ...state.conversations],

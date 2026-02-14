@@ -3,7 +3,7 @@
 **Application:** Bedrock Chat v1.0.0
 **Type:** Electron desktop application (cross-platform)
 **Purpose:** Chat interface for Amazon Bedrock LLM services
-**Review Date:** 2026-02-10 (updated)
+**Review Date:** 2026-02-13 (updated)
 **Original Review:** 2026-02-09
 **Scope:** Full source code review against CMMC Level 2 (NIST SP 800-171) controls
 
@@ -17,14 +17,16 @@ Since the original review on 2026-02-09, all **critical** and **high** severity 
 
 A comprehensive re-review on 2026-02-10 identified **4 new findings** (1 medium, 3 low) and confirmed closure of 4 previously open items. A further security review of the `web_search` and `read_webpage` tool additions on 2026-02-10 identified **4 additional findings** (1 critical, 1 high, 2 medium) related to SSRF and resource exhaustion — all remediated same-day.
 
+A security review on 2026-02-13 covered new features added since 2026-02-10: conversation drag-and-drop reordering, drag-to-archive, chat layout restyle (assistant bubble removal), tool activity group reorder, preview panel animation fix, and sidebar UI polish. This review identified **4 new findings** (2 medium, 2 low) and confirmed that all new IPC channels, database changes, and renderer UI changes follow established security patterns.
+
 ### Risk Summary
 
 | Severity | Count | Status |
 |----------|-------|--------|
 | Critical | 4 | **ALL REMEDIATED** (2026-02-09 / 2026-02-10) |
 | High | 6 | **ALL REMEDIATED** (2026-02-09 / 2026-02-10) |
-| Medium | 6 | **6 REMEDIATED** (2026-02-10) — 2 remaining: AU-F01, CM-F02 |
-| Low | 1 | SI-F08 (accepted risk) |
+| Medium | 11 | **7 REMEDIATED** (2026-02-13) — 4 remaining: AU-F01, CM-F02, SI-F09, SI-F10 |
+| Low | 3 | SI-F08 (accepted risk), SI-F11, SI-F12 (accepted risk, mitigated by iframe sandbox) |
 
 ---
 
@@ -224,22 +226,20 @@ Both methods avoid raw credential transit through the renderer. This fully addre
 
 ### MP — Media Protection
 
-#### MP-F01: SQLite Database Unencrypted at Rest — MEDIUM
+#### MP-F01: SQLite Database Unencrypted at Rest — ~~MEDIUM~~ REMEDIATED ✅
 
-**Location:** `src/main/store.ts:17-18`
-
-```typescript
-const dbPath = path.join(app.getPath('userData'), 'bedrock-chat.db');
-db = new Database(dbPath);
-```
-
-**Impact:** The SQLite database stores all conversation history, message content (which may contain CUI), SSO configuration details, and uploaded file content (base64-encoded) in plaintext on disk. If the workstation is lost, stolen, or accessed by an unauthorized user, this data is fully readable.
+**Location:** `src/main/store.ts`, `src/main/database-key.ts`, `src/main/index.ts`
+**Remediated:** 2026-02-13
 
 **CMMC Control:** MP.L2-3.8.9 — Protect the confidentiality of backup CUI at storage locations.
 
-**Mitigating Factor:** Full-disk encryption (BitLocker on Windows, FileVault on macOS) is typically enforced in CMMC environments and would protect data at rest at the volume level. This is a defense-in-depth concern.
+**Fix applied:** Replaced `better-sqlite3` with `better-sqlite3-multiple-ciphers` (drop-in compatible, bundles SQLCipher) and implemented always-on AES-256-CBC database encryption:
 
-**Recommendation:** If conversations may contain CUI, consider using SQLCipher (an encrypted SQLite variant compatible with `better-sqlite3`) for application-level encryption. At minimum, document the dependency on full-disk encryption in the deployment guide.
+1. **Key management:** 256-bit random key generated via `crypto.randomBytes(32)`, encrypted by the OS keychain (macOS Keychain / Windows DPAPI / Linux libsecret) via Electron `safeStorage` API, stored as `userData/db-key.enc` with `0o600` permissions
+2. **Startup orchestration:** `PRAGMA key` is the first statement after database open; key is zeroized from the variable after `initStore()` completes
+3. **Graceful fallback:** If `safeStorage` is unavailable (headless Linux), encryption is skipped with a console warning
+
+**Files modified:** `package.json`, `electron-builder.yml`, `vite.config.ts`, `src/main/store.ts`, `src/main/index.ts`, `src/main/database-key.ts` (new)
 
 ---
 
@@ -459,6 +459,68 @@ Together these ensure deleted conversation content (which may contain CUI) is no
 
 ---
 
+#### SI-F09: No Runtime Input Validation on `STORE_REORDER_CONVERSATIONS` Handler — MEDIUM
+
+**Location:** `src/main/ipc-handlers.ts:393-399`, `src/main/store.ts:420-428`
+
+**CMMC Control:** SI.L2-3.14.1 — Identify, report, and correct system flaws in a timely manner.
+
+**Impact:** The `STORE_REORDER_CONVERSATIONS` IPC handler accepts an `items` array directly from the renderer with no runtime validation. TypeScript type annotations (`Array<{ id: string; sortOrder: number }>`) are compile-time only and erased at runtime. Specific concerns:
+
+- **No array length check.** A compromised renderer could send an array with millions of entries, causing the database transaction to run a very large number of UPDATE statements (local denial-of-service against the main process).
+- **No type validation on elements.** Non-string `id` or non-number `sortOrder` values (e.g., `NaN`, `Infinity`, objects) would be passed to `better-sqlite3`'s `.run()` method. While parameterized queries prevent SQL injection, malformed values could cause runtime errors.
+- **No array type check.** If the renderer sends `null`, `undefined`, or a non-iterable, the `for...of` loop in `reorderConversations()` would throw an unhandled exception in the main process.
+
+**Mitigating Factor:** This is a single-user desktop app where the renderer is not exposed to external content. The IPC handler is rate-limited via the `store:write` bucket (30/10s). All queries use parameterized statements (no SQL injection possible).
+
+**Recommendation:** Add runtime validation in the IPC handler: check that `items` is an array, cap length at 5000, and validate each element has a string `id` and finite number `sortOrder`.
+
+---
+
+#### SI-F10: Unescaped Error Messages in ArtifactPanel `renderErrorHtml()` — MEDIUM
+
+**Location:** `src/renderer/components/ArtifactPanel.tsx:43-49`
+
+**CMMC Control:** SI.L2-3.14.2 — Provide protection from malicious code at designated locations.
+
+**Impact:** The `renderErrorHtml()` function interpolates `err.message` strings from mermaid and KaTeX parsers directly into an HTML template string used as the iframe `srcdoc`. If a crafted mermaid or LaTeX input produces an error message containing HTML (e.g., `<img onerror=...>`), this content would be injected into the iframe document.
+
+```typescript
+function renderErrorHtml(title: string, message: string): string {
+  return `...<h3>${title}</h3><pre>${message}</pre>...</html>`;
+}
+```
+
+**Mitigating Factor:** The iframe has `sandbox="allow-scripts"` without `allow-same-origin`, so injected JavaScript executes in a sandboxed context that cannot access the parent frame's DOM, cookies, storage, or Electron APIs. The practical exploitability is very low.
+
+**Recommendation:** Apply HTML escaping (replace `&`, `<`, `>`) to the `message` parameter before interpolation. An `escHtml` function already exists in the same file for CSV and markdown rendering.
+
+---
+
+#### SI-F11: Raw SVG Embedding in ArtifactPanel Preview — LOW (Accepted Risk)
+
+**Location:** `src/renderer/components/ArtifactPanel.tsx:33-39,322`
+
+**Impact:** The `wrapSvgInHtml()` function directly interpolates raw SVG markup from code blocks into the iframe `srcdoc`. When used for mermaid output, the SVG is generated with `securityLevel: 'strict'`. When used for user-initiated SVG preview (`language === 'svg'`), the raw code block content is passed through without sanitization. SVG can contain `<script>` tags and event handlers.
+
+**Mitigating Factor:** The iframe has `sandbox="allow-scripts"` without `allow-same-origin`. This is the intended security boundary for the preview panel — it renders user-provided code in an isolated context. Mermaid uses `securityLevel: 'strict'` for its own SVG generation.
+
+**Recommendation:** Accepted risk. The iframe sandbox is the security boundary by design. Document this decision in the function's JSDoc. Optionally, use `sandbox=""` (no `allow-scripts`) for SVG-only content if script execution is not needed for SVG rendering.
+
+---
+
+#### SI-F12: `javascript:` URLs Possible in Preview Iframe Markdown Links — LOW (Accepted Risk)
+
+**Location:** `src/renderer/components/ArtifactPanel.tsx:220`
+
+**Impact:** The `inlineFormat()` function in the artifact panel's markdown renderer converts `[text](url)` to `<a href="url">text</a>` after HTML-escaping. A `javascript:` URL (e.g., `[click](javascript:alert(1))`) would produce a clickable link in the sandboxed iframe.
+
+**Mitigating Factor:** The iframe's `sandbox="allow-scripts"` without `allow-same-origin` means any executed JavaScript is confined to the sandboxed context. Additionally, this only applies to the preview panel's inline markdown renderer — the main chat area uses `react-markdown` which does not allow raw HTML.
+
+**Recommendation:** Accepted risk. For defense-in-depth, consider validating that URLs start with `http://`, `https://`, or `mailto:` before generating `<a>` tags.
+
+---
+
 #### SI-F08: Search Queries Sent to Third-Party Service (DuckDuckGo) — LOW (Accepted Risk)
 
 **Location:** `src/main/web-search.ts:44-76`
@@ -488,6 +550,7 @@ The following security controls are correctly implemented:
 | SQL injection prevention | All queries use parameterized statements (`?` placeholders) | `src/main/store.ts` (all queries) |
 | Foreign key constraints | `PRAGMA foreign_keys = ON` with cascade deletes | `src/main/store.ts:20` |
 | WAL mode | `PRAGMA journal_mode = WAL` for database integrity | `src/main/store.ts:19` |
+| Database encryption | Always-on SQLCipher AES-256 encryption; key protected by OS keychain via `safeStorage` | `src/main/database-key.ts`, `src/main/store.ts` |
 | Secure delete | `PRAGMA secure_delete = ON` zeros freed pages; `VACUUM` after wipe | `src/main/store.ts:21,286` |
 | Credential isolation | AWS credentials stored only in main process, never sent to renderer | `src/main/credential-manager.ts` |
 | Credential zeroization | `disconnect()` overwrites credential strings before clearing references | `src/main/credential-manager.ts:182-196` |
@@ -513,6 +576,10 @@ The following security controls are correctly implemented:
 | Response size limit | 5 MB max response body prevents memory exhaustion | `src/main/web-search.ts:178,329-337` |
 | Tool input validation | `web_search` and `read_webpage` validate input types before execution | `src/main/tool-executor.ts:78-80,107-109` |
 | Redirect limit | Maximum 3 redirects to limit redirect-chain attacks | `src/main/web-search.ts:176` |
+| IPC rate limiting (write ops) | `store:write` bucket covers reorder, archive, delete, update, folder ops (30/10s) | `src/main/ipc-handlers.ts:393` |
+| Drag-and-drop data safety | Conversation IDs transferred via custom MIME type, used only as parameterized query keys | `src/renderer/components/Sidebar.tsx:22,65,533` |
+| Iframe sandbox isolation | Preview panel uses `sandbox="allow-scripts"` without `allow-same-origin` — no parent access | `src/renderer/components/ArtifactPanel.tsx:455` |
+| Mermaid strict security | Mermaid initialized with `securityLevel: 'strict'` for XSS protection | `src/renderer/components/ArtifactPanel.tsx:325` |
 | Document name sanitization | Special characters stripped before Bedrock API calls | `src/main/bedrock-stream.ts:30-37` |
 | Stream abort support | Active streams can be cancelled via `AbortController` | `src/main/bedrock-stream.ts:23,125` |
 | TLS 1.2+ enforcement | All AWS SDK clients use `NodeHttpHandler` with `minVersion: 'TLSv1.2'` | `src/main/bedrock-client.ts:17-20`, `src/main/sso-auth.ts:27-30` |
@@ -527,7 +594,7 @@ The following security controls are correctly implemented:
 |---------|---------|-----------------|
 | electron | ^33.2.0 | Current major release. Monitor Electron security advisories. |
 | @aws-sdk/* | ^3.700-3.986 | Current AWS SDK v3. Well-maintained, frequent security patches. |
-| better-sqlite3 | ^11.7.0 | Native module. Trusted maintainer. No known CVEs. |
+| better-sqlite3-multiple-ciphers | ^11.7.0 | Native module. Drop-in replacement for `better-sqlite3` bundling SQLCipher (AES-256-CBC, HMAC-SHA512, PBKDF2). FIPS-approved algorithms. |
 | react | ^18.3.1 | Current. Auto-escapes JSX output (XSS safe by default). |
 | react-markdown | ^9.0.1 | Does NOT render raw HTML without `rehype-raw` plugin (safe). |
 | rehype-highlight | ^7.0.1 | Code syntax highlighting. Low risk. |
@@ -568,19 +635,23 @@ The following security controls are correctly implemented:
 | 15 | SC-F04 | Medium | 1 hour | ✅ **REMEDIATED** — `safeOpenExternal()` validates URL schemes (HTTP/S only) |
 | 16 | AU-F01 | Medium | 4-6 hours | ⬜ Implement structured audit logging |
 | 17 | SI-F04 | Medium | 2-3 hours | ✅ **REMEDIATED** — Sliding-window rate limiter on 6 IPC handlers |
+| 26 | SI-F09 | Medium | 1 hour | ⬜ Add runtime input validation to `STORE_REORDER_CONVERSATIONS` handler |
+| 27 | SI-F10 | Medium | 15 min | ⬜ HTML-escape error messages in `renderErrorHtml()` |
 
 ### Medium-Term (Before Production)
 
 | # | Finding | Severity | Effort | Action |
 |---|---------|----------|--------|--------|
 | 18 | CM-F02 | Medium | 2-4 hours | ⬜ Configure code signing for macOS and Windows |
-| 19 | MP-F01 | Medium | 4-8 hours | ⬜ Evaluate SQLCipher for database encryption (if CUI stored) |
+| 19 | MP-F01 | Medium | 4-8 hours | ✅ **REMEDIATED** — SQLCipher AES-256 encryption via `better-sqlite3-multiple-ciphers`, key protected by OS keychain (`safeStorage`) |
 | 20 | SI-F06 | Low | 30 min | ✅ **REMEDIATED** — `PRAGMA secure_delete = ON` at init + `VACUUM` after wipe |
 | 21 | SI-F05 | Low | 30 min | ✅ **REMEDIATED** — `clearTokenCache()` + `clearPendingWizardToken()` on disconnect |
 | 22 | SC-F05 | Low | 15 min | ✅ **REMEDIATED** — Added `blob:` to CSP `img-src` directive |
 | 23 | AC-F04 | Low | 15 min | ✅ **REMEDIATED** — Least-privilege permission handlers (`openExternal` only) on default session |
 | 24 | SC-F03 | Low | 30 min | ✅ **REMEDIATED** — `NodeHttpHandler` with `minVersion: 'TLSv1.2'` on all SDK clients |
 | 25 | SI-F08 | Low | — | Accepted Risk — Document third-party data flow in SSP |
+| 28 | SI-F11 | Low | — | Accepted Risk — Raw SVG in sandboxed iframe; `allow-scripts` without `allow-same-origin` is the security boundary |
+| 29 | SI-F12 | Low | 15 min | Accepted Risk — `javascript:` URLs contained by iframe sandbox; optional URL scheme validation for defense-in-depth |
 
 ---
 
@@ -592,9 +663,9 @@ The following security controls are correctly implemented:
 | AU — Audit & Accountability | AU.L2-3.3.1, 3.3.2 | 1 finding | Not Implemented |
 | CM — Configuration Management | CM.L2-3.4.1, 3.4.2, 3.4.6 | 3 findings (2 remediated) | Partial — CM-F02 (code signing) open |
 | IA — Identification & Auth | IA.L2-3.5.10 | 1 finding (1 remediated) | **Complete** — Manual keys removed |
-| MP — Media Protection | MP.L2-3.8.3, 3.8.9 | 2 findings | Partial — depends on FDE + secure delete |
+| MP — Media Protection | MP.L2-3.8.3, 3.8.9 | 2 findings (2 remediated) | **Complete** — SQLCipher encryption + secure delete |
 | SC — System & Comms Protection | SC.L2-3.13.1, 3.13.8, 3.13.16 | 7 findings (7 remediated) | **Complete** — all findings closed |
-| SI — System & Info Integrity | SI.L2-3.14.1, 3.14.2, 3.14.3, 3.14.6 | 8 findings (7 remediated) | **Substantially complete** — SI-F08 (accepted risk) only |
+| SI — System & Info Integrity | SI.L2-3.14.1, 3.14.2, 3.14.3, 3.14.6 | 12 findings (7 remediated, 2 open, 3 accepted risk) | **Substantially complete** — SI-F09, SI-F10 open; SI-F08, SI-F11, SI-F12 accepted risk |
 
 ---
 
@@ -649,3 +720,9 @@ The following security controls are correctly implemented:
 | 2026-02-10 | SC-F05 | Low → Remediated | Added `blob:` to CSP `img-src` directive for `FilePreview.tsx` blob URL support. | `src/renderer/index.html` |
 | 2026-02-10 | AC-F04 | Remediated (updated) | Refined deny-all permission handler to allow `openExternal` (least privilege). Added `setPermissionCheckHandler` (Electron 33 sync counterpart). The initial deny-all blocked `shell.openExternal()`, preventing SSO browser popups. | `src/main/index.ts` |
 | 2026-02-10 | SC-F04 | Remediated (updated) | Added native OS fallback (`execFile open/xdg-open/cmd`) in `safeOpenExternal()` if `shell.openExternal()` is blocked by session permissions. Uses `execFile` (not `exec`) to prevent command injection. | `src/main/safe-open.ts` |
+| 2026-02-13 | SI-F09 | — | NEW finding (Medium): `STORE_REORDER_CONVERSATIONS` IPC handler accepts unchecked array from renderer — no runtime validation on items array type, length, or element shape. Parameterized queries prevent SQL injection, but malformed input could cause unhandled exceptions. | — |
+| 2026-02-13 | SI-F10 | — | NEW finding (Medium): `renderErrorHtml()` in ArtifactPanel interpolates `err.message` from mermaid/KaTeX parsers without HTML escaping. Mitigated by iframe `sandbox="allow-scripts"` without `allow-same-origin`. | — |
+| 2026-02-13 | SI-F11 | — | NEW finding (Low, Accepted Risk): `wrapSvgInHtml()` embeds raw SVG from code blocks into iframe srcdoc without sanitization. Mermaid output uses `securityLevel: 'strict'`. User SVG is sandboxed. | — |
+| 2026-02-13 | SI-F12 | — | NEW finding (Low, Accepted Risk): `inlineFormat()` markdown renderer allows `javascript:` URLs in `<a>` tags within sandboxed preview iframe. | — |
+| 2026-02-13 | — | — | Security review of new features: conversation drag-and-drop reordering (`STORE_REORDER_CONVERSATIONS` IPC channel, `sort_order` DB column, batch reorder transaction), drag-to-archive, chat layout restyle, tool activity group reorder, preview panel animation fix, sidebar UI polish. DnD data flow confirmed safe — conversation IDs used only as parameterized query keys. Rate limiting applied via `store:write` bucket. | `src/shared/ipc-channels.ts`, `src/main/store.ts`, `src/main/ipc-handlers.ts`, `src/preload/index.ts`, `src/renderer/lib/ipc-client.ts`, `src/renderer/stores/chat-store.ts`, `src/renderer/hooks/useConversations.ts`, `src/renderer/components/Sidebar.tsx`, `src/renderer/components/MessageBubble.tsx`, `src/renderer/components/ToolActivityGroup.tsx`, `src/renderer/components/ArtifactPanel.tsx` |
+| 2026-02-13 | MP-F01 | Medium → Remediated | Replaced `better-sqlite3` with `better-sqlite3-multiple-ciphers` (drop-in compatible, bundles SQLCipher). Implemented always-on AES-256-CBC database encryption: 256-bit key generated via `crypto.randomBytes(32)`, encrypted by OS keychain (`safeStorage` API), stored as `userData/db-key.enc` with `0o600` permissions. `PRAGMA key` is the first statement after database open; key variable zeroized after `initStore()`. Graceful fallback to plaintext on headless Linux (no keychain). | `package.json`, `electron-builder.yml`, `vite.config.ts`, `src/main/store.ts`, `src/main/index.ts`, `src/main/database-key.ts` (new) |

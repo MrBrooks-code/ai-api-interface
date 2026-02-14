@@ -288,14 +288,16 @@ export default function Sidebar() {
 
   // Context menu state — tracks which item's "⋯" menu is open
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLSpanElement>(null);
   const [folderMenuOpenId, setFolderMenuOpenId] = useState<string | null>(null);
-  const folderMenuRef = useRef<HTMLDivElement>(null);
+  const folderMenuRef = useRef<HTMLSpanElement>(null);
 
   // Drag-and-drop state
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const [isDraggingConversation, setIsDraggingConversation] = useState(false);
   const [reorderTarget, setReorderTarget] = useState<{ conversationId: string; position: 'above' | 'below' } | null>(null);
+  const reorderTargetRef = useRef(reorderTarget);
+  reorderTargetRef.current = reorderTarget;
   const [dragOverArchive, setDragOverArchive] = useState(false);
   const draggingConversationIdRef = useRef<string | null>(null);
 
@@ -611,11 +613,12 @@ export default function Sidebar() {
     // Same group: reorder
     const orderedIds = groupConvos.map((c) => c.id).filter((id) => id !== draggedId);
     const targetIndex = orderedIds.indexOf(targetId);
-    const position = reorderTarget?.conversationId === targetId ? reorderTarget.position : 'below';
+    const currentTarget = reorderTargetRef.current;
+    const position = currentTarget?.conversationId === targetId ? currentTarget.position : 'below';
     const insertIndex = position === 'above' ? targetIndex : targetIndex + 1;
     orderedIds.splice(insertIndex, 0, draggedId);
     reorderConversations(orderedIds);
-  }, [reorderTarget, reorderConversations, moveConversationToFolder, unarchiveConversation, archiveConversation]);
+  }, [reorderConversations, moveConversationToFolder, unarchiveConversation, archiveConversation]);
 
   const handleRowDragLeave = useCallback(() => {
     setReorderTarget(null);

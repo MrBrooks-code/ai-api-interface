@@ -25,7 +25,7 @@ Four parallel reviewers examined the renderer, main process, shared/IPC layer, a
 |---|------|------|-------|--------|
 | 9 | Main | `src/main/ipc-handlers.ts` | **No rate limiting on database write operations.** | FIXED — added `store:write` rate limit (30/10s) to create, delete, update, save handlers |
 | 10 | Main | `src/main/store.ts` | **`saveMessage` lacks transaction wrapping.** | FIXED — wrapped in `db.transaction()` |
-| 11 | Main | `src/main/store.ts:282-286` | **`VACUUM` blocks the main thread.** After `wipeAllData()`, synchronous VACUUM freezes all IPC handlers. | Open — infrequent operation; async VACUUM not supported by better-sqlite3 |
+| 11 | Main | `src/main/store.ts:282-286` | **`VACUUM` blocks the main thread.** After `wipeAllData()`, synchronous VACUUM freezes all IPC handlers. | FIXED — deferred VACUUM via `setImmediate()` so pending IPC responses flush first |
 | 12 | Main | `src/main/bedrock-stream.ts` | **Streams continue after window destruction.** | FIXED — added `window.isDestroyed()` check in stream loop |
 | 13 | Shared | `src/shared/types.ts` | **`StreamEvent.data` is `Record<string, unknown>`.** | FIXED — replaced with discriminated union; eliminated ~10 `as` casts |
 | 14 | Shared | `src/shared/ipc-channels.ts` | **Dead `AWS_SSO_LOGIN` channel.** | FIXED — removed |
@@ -34,9 +34,9 @@ Four parallel reviewers examined the renderer, main process, shared/IPC layer, a
 | 17 | Renderer | `src/renderer/components/MessageList.tsx` | **`groupMessages()` called on every render.** | FIXED — wrapped in `useMemo` |
 | 18 | Renderer | `src/renderer/components/SettingsPanel.tsx` | **`modelsByProvider` recomputed every render.** | FIXED — wrapped in `useMemo` |
 | 19 | Renderer | `src/renderer/hooks/useAutoConnect.ts` | **SSO listener leak on early return.** | FIXED — listener registered before async IIFE so cleanup is always valid |
-| 20 | Build | `package.json:16-20` | **AWS SDK version skew.** `bedrock-runtime` and `credential-providers` at `^3.700.0` vs others at `^3.986.0`. | Open — requires `npm install` and regression testing |
-| 21 | Build | `package.json` | **No test framework.** Zero test coverage. | Open — requires project decision on framework (Vitest recommended) |
-| 22 | Build | `package.json:9` | **ESLint not in devDependencies.** `npm run lint` will fail. | Open — requires `npm install eslint` + config setup |
+| 20 | Build | `package.json:16-20` | **AWS SDK version skew.** `bedrock-runtime` and `credential-providers` at `^3.700.0` vs others at `^3.986.0`. | FIXED — aligned all AWS SDK packages to `^3.986.0` |
+| 21 | Build | `package.json` | **No test framework.** Zero test coverage. | FIXED — added Vitest with config and placeholder test |
+| 22 | Build | `package.json:9` | **ESLint not in devDependencies.** `npm run lint` will fail. | FIXED — added ESLint + @typescript-eslint to devDependencies with flat config |
 
 ---
 
@@ -52,29 +52,70 @@ Four parallel reviewers examined the renderer, main process, shared/IPC layer, a
 
 ---
 
+---
+
+## New Findings — 2026-02-13 Review
+
+Features reviewed: conversation drag-and-drop reordering, drag-to-archive, chat layout restyle (assistant bubble removal), tool activity group reorder, preview panel animation fix, sidebar UI polish.
+
+### Bugs (Should Fix)
+
+| # | Area | File | Issue | Status |
+|---|------|------|-------|--------|
+| 28 | Renderer | `src/renderer/hooks/useConversations.ts:60-64` | **Reorder optimistic update with no IPC failure rollback.** `store.reorderConversations()` runs before `ipc.reorderConversations()`. If IPC fails (rate limit, DB error), UI diverges from database. On next load, order reverts silently. | FIXED — added try/catch around IPC call; on failure, reloads conversations from DB via `loadConversations()` |
+| 29 | Renderer | `src/renderer/components/ArtifactPanel.tsx:294-301` | **Close/open race condition.** If user opens a new preview before the 300ms close `setTimeout` fires, the timeout still executes — unmounting the panel and clearing the new preview content. `isClosing.current = false` in the open path doesn't cancel the pending timeout. | FIXED — stored timeout ID in `closeTimerRef`; open path clears it with `clearTimeout` |
+| 30 | Renderer | `src/renderer/components/Sidebar.tsx:291-293` | **Ref type mismatch.** `menuRef` and `folderMenuRef` are `useRef<HTMLDivElement>(null)` but applied to `<span>` elements in `ConversationRow`/`FolderRow`. Should be `useRef<HTMLSpanElement>`. | FIXED — changed both refs to `useRef<HTMLSpanElement>(null)` |
+
+### Improvements (Should Consider)
+
+| # | Area | File | Issue | Status |
+|---|------|------|-------|--------|
+| 31 | Main | `src/main/store.ts:151-154` | **`archiveConversation` does not clear `sort_order`.** Stale sort order from original group persists into archive list, causing unexpected positioning among archived conversations. Should add `sort_order = NULL` to archive UPDATE. | FIXED — added `sort_order = NULL` to archive UPDATE |
+| 32 | Main | `src/main/store.ts:157-161` | **`unarchiveConversation` does not clear `sort_order`.** Same issue — stale sort order causes unexpected positioning when conversation is restored to active list. | FIXED — added `sort_order = NULL` to unarchive UPDATE |
+| 33 | Renderer | `src/renderer/stores/chat-store.ts:169` | **Store-side `archiveConversation` does not clear `sortOrder`.** Sets `folderId: undefined` but preserves `sortOrder` from the conversation's original group position. | FIXED — added `sortOrder: undefined` to both archive and unarchive actions |
+| 34 | Renderer | `src/renderer/hooks/useConversations.ts:60-64` | **No rate-limit response checking on reorder IPC.** Handler returns `{ error: 'Rate limit exceeded...' }` when rate-limited, but hook doesn't check return value — optimistic update already applied. | FIXED — checks return value for `error` property; reloads from DB on rate-limit |
+| 35 | Renderer | `src/renderer/components/ArtifactPanel.tsx:314-341` | **`srcdoc` not cleared on panel close.** When reopened with different content, iframe may briefly flash previous content before useEffect updates it. | FIXED — `setSrcdoc('')` called in both `handleClose` and external-clear paths |
+| 36 | Renderer | `src/renderer/hooks/useFolders.ts:41-44` | **Inconsistent optimistic-vs-await pattern.** `moveConversationToFolder` awaits IPC before store update (safe but slow), while `reorderConversations` does optimistic update first (fast but no rollback). Patterns should be consistent. | FIXED — added try/catch and rate-limit checking to `moveConversationToFolder` |
+| 37 | Renderer | `src/renderer/components/Sidebar.tsx:614` | **`handleRowDrop` may read stale `reorderTarget`.** Between `onDragOver` setting state and `onDrop` firing, React may not have re-rendered, causing the callback to capture an older `reorderTarget` value. Falls back to `'below'` if stale. | FIXED — added `reorderTargetRef` mirroring state; drop handler reads from ref |
+
+### Nits (Low Priority)
+
+| # | Area | Issue | Status |
+|---|------|-------|--------|
+| 38 | Main | `src/main/store.ts:64-82` — Migration `catch {}` blocks swallow all errors, not just "duplicate column name". Disk-full or database-locked errors are silently ignored. | Open |
+| 39 | Renderer | `src/renderer/components/Sidebar.tsx:625-657` — `renderConversationRows` is a function declaration inside the component body, re-declared every render with new callback instances. `React.memo` on `ConversationRow` won't help since callbacks change. | Open |
+| 40 | Renderer | `src/renderer/components/ArtifactPanel.tsx:373-380` — Escape key handler conflicts with Sidebar. Both register `keydown` listeners; pressing Escape with both panel open and delete confirmation active triggers both handlers. | Open |
+| 41 | All Hooks | `useConversations.ts`, `useFolders.ts` — Empty `useCallback` dependency arrays `[]` rely on Zustand stable singleton refs. Technically correct but triggers `react-hooks/exhaustive-deps` lint warnings. | Open |
+
+---
+
 ## Summary
 
 | Category | Count |
 |----------|-------|
-| Bugs | 8 |
-| Improvements | 14 |
-| Nits | 5 |
-| **Total** | **27** |
+| Bugs | 11 |
+| Improvements | 21 |
+| Nits | 9 |
+| **Total** | **41** |
 
 ## Fix Summary
 
 | Status | Count |
 |--------|-------|
-| FIXED | 20 |
-| Open (accepted) | 7 |
-| **Total** | **27** |
+| FIXED | 33 |
+| Open (accepted / new) | 8 |
+| **Total** | **41** |
 
-### Remaining Open Items
+### Remaining Open Items (Pre-Existing)
 
 - **#2** — Race condition on `pendingWizardToken` (low practical risk; UI prevents concurrent wizard flows)
-- **#11** — `VACUUM` blocks main thread (infrequent operation; async VACUUM not supported by better-sqlite3)
-- **#20** — AWS SDK version skew (requires `npm install` and regression testing)
-- **#21** — No test framework (requires project decision on framework — Vitest recommended)
-- **#22** — ESLint not in devDependencies (requires `npm install eslint` + config)
 - **#23** — Rate limiter keys hardcoded (acceptable; keys are intentionally distinct from channel names)
 - **#24** — Inconsistent IPC error response shapes (would require coordinated refactor)
+
+### New Open Items (2026-02-13)
+
+- **#38** — Migration catch blocks swallow all errors
+- **#39** — `renderConversationRows` re-declared every render
+- **#40** — Escape key handler conflicts
+- **#41** — Empty `useCallback` dependency arrays
+- **#27** — `skipLibCheck: true` in tsconfig (removing would surface upstream type errors)

@@ -5,17 +5,26 @@
  * concurrency and foreign key constraints for referential integrity.
  */
 
-import Database from 'better-sqlite3';
+import Database from 'better-sqlite3-multiple-ciphers';
 import { app } from 'electron';
 import path from 'path';
 import type { Conversation, ChatMessage, ContentBlock, Folder, SsoConfiguration } from '../shared/types';
 
 let db: Database.Database;
 
-/** Opens the SQLite database and creates tables if they don't exist. */
-export function initStore() {
+/**
+ * Opens the SQLite database and creates tables if they don't exist. When
+ * `hexKey` is provided, the database is opened with SQLCipher AES-256
+ * encryption — `PRAGMA key` must be the first statement after open.
+ */
+export function initStore(hexKey?: string) {
   const dbPath = path.join(app.getPath('userData'), 'bedrock-chat.db');
   db = new Database(dbPath);
+
+  if (hexKey) {
+    db.pragma(`key="x'${hexKey}'"`);
+  }
+
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.pragma('secure_delete = ON');
@@ -149,14 +158,14 @@ export function updateConversationTitle(id: string, title: string): void {
 
 /** Marks a conversation as archived by setting `archived_at` and clearing its folder. */
 export function archiveConversation(id: string): void {
-  db.prepare('UPDATE conversations SET archived_at = ?, folder_id = NULL WHERE id = ?')
+  db.prepare('UPDATE conversations SET archived_at = ?, folder_id = NULL, sort_order = NULL WHERE id = ?')
     .run(Date.now(), id);
 }
 
 /** Restores an archived conversation and bumps `updated_at` so it surfaces near the top. */
 export function unarchiveConversation(id: string): void {
   const now = Date.now();
-  db.prepare('UPDATE conversations SET archived_at = NULL, updated_at = ? WHERE id = ?')
+  db.prepare('UPDATE conversations SET archived_at = NULL, updated_at = ?, sort_order = NULL WHERE id = ?')
     .run(now, id);
 }
 
@@ -358,7 +367,7 @@ export function wipeAllData(): void {
   db.exec('DELETE FROM conversations');
   db.exec('DELETE FROM folders');
   db.exec('DELETE FROM sso_configs');
-  db.exec('VACUUM');
+  setImmediate(() => { db.exec('VACUUM'); });
 }
 
 // --- Folders ---

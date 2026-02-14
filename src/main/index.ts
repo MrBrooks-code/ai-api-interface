@@ -10,6 +10,7 @@ import path from 'path';
 import { registerIpcHandlers } from './ipc-handlers';
 import { initStore } from './store';
 import { safeOpenExternal } from './safe-open';
+import { isKeychainAvailable, resolveKey } from './database-key';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -71,7 +72,16 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  initStore();
+  let dbKey: string | undefined;
+
+  if (isKeychainAvailable()) {
+    dbKey = resolveKey();
+  } else {
+    console.warn('[db-encryption] OS keychain unavailable — database will not be encrypted');
+  }
+
+  initStore(dbKey);
+  dbKey = undefined;
   registerIpcHandlers();
   createWindow();
 

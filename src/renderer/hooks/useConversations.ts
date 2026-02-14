@@ -60,8 +60,16 @@ export function useConversations() {
   const reorderConversations = useCallback(async (orderedIds: string[]) => {
     const items = orderedIds.map((id, i) => ({ id, sortOrder: i }));
     store.reorderConversations(orderedIds);
-    await ipc.reorderConversations(items);
-  }, []);
+    try {
+      const result = await ipc.reorderConversations(items);
+      if (result && typeof result === 'object' && 'error' in result) {
+        await loadConversations();
+      }
+    } catch {
+      // IPC failed (rate limit, DB error) — reload from database to re-sync
+      await loadConversations();
+    }
+  }, [loadConversations]);
 
   // Load conversations on mount
   useEffect(() => {

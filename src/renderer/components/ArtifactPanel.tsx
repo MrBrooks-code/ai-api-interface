@@ -255,6 +255,7 @@ export default function ArtifactPanel() {
   const [mounted, setMounted] = useState(false);
   const isDragging = useRef(false);
   const isClosing = useRef(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingOpen = useRef(false);
   const asideRef = useRef<HTMLElement>(null);
   const [srcdoc, setSrcdoc] = useState('');
@@ -263,6 +264,11 @@ export default function ArtifactPanel() {
   // Slide open when previewPanel becomes non-null, unmount when it goes null externally
   useEffect(() => {
     if (previewPanel) {
+      // Cancel any pending close timeout so it doesn't unmount the new preview
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
       isClosing.current = false;
       if (!mounted) {
         // Fresh open: mount at width 0, animation triggered by layout effect below
@@ -273,6 +279,7 @@ export default function ArtifactPanel() {
       // If already mounted (swapping content), width stays as-is — no animation needed
     } else if (mounted) {
       // Store cleared previewPanel externally (e.g. conversation switch/delete)
+      setSrcdoc('');
       setAnimatedWidth(0);
       setMounted(false);
       isClosing.current = false;
@@ -294,8 +301,10 @@ export default function ArtifactPanel() {
   const handleClose = useCallback(() => {
     if (isClosing.current) return;
     isClosing.current = true;
+    setSrcdoc('');
     setAnimatedWidth(0);
-    setTimeout(() => {
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
       setMounted(false);
       closePreviewPanel();
     }, ANIMATION_MS);

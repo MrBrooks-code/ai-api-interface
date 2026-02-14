@@ -1,7 +1,7 @@
 # CMMC Level 2 Shared Responsibility Matrix — Bedrock Chat
 
 **Application:** Bedrock Chat v1.0.0
-**Date:** 2026-02-10
+**Date:** 2026-02-13
 **Scope:** All 14 CMMC Level 2 (NIST SP 800-171) domains
 **Companion Document:** [`SECURITY-REVIEW.md`](./SECURITY-REVIEW.md)
 
@@ -22,7 +22,7 @@
 | Control | Responsibility | Implementation / Evidence |
 |---------|---------------|--------------------------|
 | **AC.L2-3.1.1** Limit system access to authorized users | Application | Electron sandbox (`sandbox: true`), `contextIsolation: true`, `nodeIntegration: false` — `src/main/index.ts:29-33`. IPC bridge is the only renderer→main channel — `src/preload/index.ts:141`. Deny-all `setPermissionRequestHandler` rejects all Chromium permission requests — `src/main/index.ts:37-39`. AC-F04 remediated. |
-| **AC.L2-3.1.2** Limit system access to authorized transactions/functions | Application | All IPC uses `ipcMain.handle()` (request/response only, no fire-and-forget `ipcMain.on`) — `src/main/ipc-handlers.ts`. File reads restricted to dialog-selected paths via `allowedPaths` set — `src/main/file-handler.ts:13,73`. |
+| **AC.L2-3.1.2** Limit system access to authorized transactions/functions | Application | All IPC uses `ipcMain.handle()` (request/response only, no fire-and-forget `ipcMain.on`) — `src/main/ipc-handlers.ts`. File reads restricted to dialog-selected paths via `allowedPaths` set — `src/main/file-handler.ts:13,73`. New `STORE_REORDER_CONVERSATIONS` channel follows same `handle()`/`invoke()` pattern with `store:write` rate limiting — `src/main/ipc-handlers.ts:393-399`. |
 | **AC.L2-3.1.3** Control the flow of CUI | Shared | **App:** Credentials held exclusively in main process, never sent to renderer — `src/main/credential-manager.ts:22`. Conversations stored locally in SQLite — `src/main/store.ts:17`. **Org:** Network egress controls (firewall to `*.amazonaws.com` only), DLP policies for CUI classification. |
 | **AC.L2-3.1.10** Session lock after inactivity | Shared | **App:** Configurable maximum session duration timer — `src/main/credential-manager.ts:204-219`, default 60 min via `resources/admin-config.json:7`. On expiry, credentials are zeroized and renderer notified via `AWS_SESSION_EXPIRED`. **Org:** OS-level screen lock (GPO/MDM) for true inactivity detection. |
 | **AC.L2-3.1.11** Terminate sessions after defined conditions | Application | Session timer calls `disconnect()` → zeroizes credentials → notifies renderer — `src/main/credential-manager.ts:180-197,204-211`. Timer duration configurable by IT via `admin-config.json`. |
@@ -149,7 +149,7 @@
 |---------|---------------|--------------------------|
 | **RA.L2-3.11.1** Periodically assess risk | Shared | **App:** `SECURITY-REVIEW.MD` documents all findings with CMMC control mapping, severity ratings, and remediation status. Updated with each feature addition. **Org:** Organizational risk assessment program, POA&M management. |
 | **RA.L2-3.11.2** Scan for vulnerabilities periodically and when new vulnerabilities are identified | Shared | **App:** `npm audit` recommended for dependency scanning. TypeScript strict mode catches type-safety issues — `tsconfig.json:8`. **Org:** Vulnerability scanning tools, scan cadence policy. |
-| **RA.L2-3.11.3** Remediate vulnerabilities in accordance with assessments | Shared | **App:** Remediation log in `SECURITY-REVIEW.MD` tracks all fixes with dates, findings, and files modified. 4 critical, 6 high findings remediated. **Org:** POA&M tracking and milestone enforcement. |
+| **RA.L2-3.11.3** Remediate vulnerabilities in accordance with assessments | Shared | **App:** Remediation log in `SECURITY-REVIEW.MD` tracks all fixes with dates, findings, and files modified. 4 critical, 6 high, 6 medium findings remediated (as of 2026-02-13). 4 medium and 3 low findings remain open. **Org:** POA&M tracking and milestone enforcement. |
 
 ---
 
@@ -184,8 +184,8 @@
 
 | Control | Responsibility | Implementation / Evidence |
 |---------|---------------|--------------------------|
-| **SI.L2-3.14.1** Identify, report, and correct system flaws | Shared | **App:** `SECURITY-REVIEW.MD` identifies and tracks all flaws. Remediation log documents every fix. TypeScript strict mode — `tsconfig.json:8`. `npm audit` recommended for dependencies. **Org:** Patch management program, vulnerability disclosure process. |
-| **SI.L2-3.14.2** Provide protection from malicious code | Application | Sandboxed expression evaluation (`expr-eval`, no `eval()`/`Function()`) — `src/main/tool-executor.ts:8,12`. CSP blocks external scripts — `src/renderer/index.html:8`. React auto-escaping prevents XSS. No `dangerouslySetInnerHTML`. `react-markdown` v9 does not render raw HTML. Parameterized SQL prevents injection — `src/main/store.ts` (all queries). Input validation on tool executors — `src/main/tool-executor.ts:78-80,107-109`. |
+| **SI.L2-3.14.1** Identify, report, and correct system flaws | Shared | **App:** `SECURITY-REVIEW.MD` identifies and tracks all flaws (29 findings as of 2026-02-13). Remediation log documents every fix. Security review updated on each feature addition (latest: drag-and-drop reordering, chat layout restyle, sidebar polish — 2026-02-13). TypeScript strict mode — `tsconfig.json:8`. `npm audit` recommended for dependencies. **Org:** Patch management program, vulnerability disclosure process. |
+| **SI.L2-3.14.2** Provide protection from malicious code | Application | Sandboxed expression evaluation (`expr-eval`, no `eval()`/`Function()`) — `src/main/tool-executor.ts:8,12`. CSP blocks external scripts — `src/renderer/index.html:8`. React auto-escaping prevents XSS — confirmed no `dangerouslySetInnerHTML` or `rehype-raw` in any renderer component (2026-02-13 audit). `react-markdown` v9 does not render raw HTML. Parameterized SQL prevents injection — `src/main/store.ts` (all queries, including new `reorderConversations` batch UPDATE). Drag-and-drop data (conversation IDs) used only as parameterized query bind values — no injection risk. ArtifactPanel renders user content in sandboxed iframe (`sandbox="allow-scripts"` without `allow-same-origin`) — `src/renderer/components/ArtifactPanel.tsx:455`. Input validation on tool executors — `src/main/tool-executor.ts:78-80,107-109`. Open findings: SI-F09 (IPC input validation), SI-F10 (error message HTML escaping). |
 | **SI.L2-3.14.3** Monitor security alerts and advisories | Shared | **App:** SSO token expiry validation — `src/main/sso-auth.ts:107,254,278`. SSO tokens zeroized on disconnect via `clearTokenCache()` and `clearPendingWizardToken()` — `src/main/sso-auth.ts:253-263`, `src/main/ipc-handlers.ts:57-62`. Rate limiting detects request flooding — `src/main/ipc-rate-limiter.ts:18-37`. **Org:** CVE monitoring for Electron, AWS SDK, and all dependencies. Subscribe to Electron security advisories. |
 | **SI.L2-3.14.4** Update malicious code protection mechanisms | Organization | Endpoint AV/EDR updates managed by MDM. Application updates deployed through organizational channels (no auto-update). |
 | **SI.L2-3.14.5** Perform periodic scans and real-time scans of files from external sources | Shared | **App:** Uploaded files validated for size (50 MB max) — `src/main/file-handler.ts:65,81`. File type restricted by extension — `src/main/file-handler.ts:16-35`. Response body size limited to 5 MB — `src/main/web-search.ts:178,329-337`. **Org:** Endpoint AV real-time scanning. |
@@ -221,4 +221,4 @@
 1. **Application implements 21 controls directly** — primarily in Access Control, Configuration Management, Identification & Authentication, and System & Communications Protection.
 2. **33 controls are purely organizational** — Physical Protection, Personnel Security, and Audit & Accountability require organizational infrastructure beyond the application's scope.
 3. **27 controls are shared** — the application provides technical mechanisms, but the organization must configure, monitor, and enforce policies around them.
-4. **Open items affecting compliance:** AU-F01 (audit logging, medium), CM-F02 (code signing, medium), and 1 accepted-risk finding (SI-F08, low) documented in `SECURITY-REVIEW.MD`.
+4. **Open items affecting compliance:** AU-F01 (audit logging, medium), CM-F02 (code signing, medium), SI-F09 (IPC input validation, medium), SI-F10 (error message HTML escaping, medium), and 3 accepted-risk findings (SI-F08, SI-F11, SI-F12 — all low) documented in `SECURITY-REVIEW.MD`.

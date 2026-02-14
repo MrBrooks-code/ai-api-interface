@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
             sourcemap: !isProduction,
             outDir: path.resolve(__dirname, 'dist-electron/main'),
             rollupOptions: {
-              external: ['better-sqlite3'],
+              external: ['better-sqlite3-multiple-ciphers'],
             },
           },
           resolve: {

@@ -39,8 +39,13 @@ export function useFolders() {
   }, []);
 
   const moveConversationToFolder = useCallback(async (conversationId: string, folderId: string | null) => {
-    await ipc.moveConversationToFolder(conversationId, folderId);
-    store.moveConversationToFolder(conversationId, folderId);
+    try {
+      const result = await ipc.moveConversationToFolder(conversationId, folderId);
+      if (result && typeof result === 'object' && 'error' in result) return;
+      store.moveConversationToFolder(conversationId, folderId);
+    } catch {
+      // IPC failure — store was not updated, state remains consistent
+    }
   }, []);
 
   const toggleFolderCollapsed = useCallback((id: string) => {

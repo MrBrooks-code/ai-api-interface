@@ -37,7 +37,8 @@ Bedrock Chat provides a native desktop interface to Amazon Bedrock's Converse AP
 |  sso-auth ------------ Device auth flow + token cache    |
 |  bedrock-client ------ AWS SDK client instances          |
 |  bedrock-stream ------ Converse API streaming            |
-|  store --------------- SQLite via better-sqlite3         |
+|  store --------------- SQLite via better-sqlite3-mc      |
+|  database-key -------- Encryption key via safeStorage   |
 |  tool-executor ------- Safe tool execution               |
 |  web-search ---------- DuckDuckGo + webpage reader       |
 |  file-handler -------- Dialog + validated file reads     |
@@ -105,6 +106,7 @@ src/
 |   +-- bedrock-client.ts
 |   +-- bedrock-stream.ts
 |   +-- store.ts             # SQLite database
+|   +-- database-key.ts      # Encryption key management (safeStorage)
 |   +-- tool-executor.ts
 |   +-- web-search.ts        # DuckDuckGo search + webpage reader
 |   +-- file-handler.ts
@@ -194,6 +196,32 @@ IT administrators can customize the application by editing `resources/admin-conf
 | `loginBanner.titlebar` | Text displayed in the application title bar |
 | `sessionDurationMinutes` | Auto-disconnect timeout in minutes (default: 60). Credentials are zeroized on expiry. |
 
+### Database Encryption
+
+Bedrock Chat encrypts the local database with AES-256 via SQLCipher. All conversation history, message content, SSO configurations, and uploaded file data are encrypted at rest automatically.
+
+**How it works:**
+
+1. A 256-bit random key is generated on first launch via `crypto.randomBytes(32)`
+2. The key is encrypted by the OS keychain and stored at `<userData>/db-key.enc` with `0o600` permissions:
+   - **macOS:** Keychain (FIPS-validated corecrypto)
+   - **Windows:** DPAPI (FIPS-validated CNG)
+   - **Linux:** libsecret / desktop keyring
+3. On each launch, the key is decrypted and passed to SQLCipher via `PRAGMA key` before any database operations
+
+| Property | Value |
+|----------|-------|
+| Cipher | AES-256-CBC |
+| Authentication | HMAC-SHA512 |
+| Key derivation | PBKDF2 (bypassed — key is already high-entropy) |
+| Key storage | OS keychain via Electron `safeStorage` API |
+| FIPS compliance | FIPS-approved algorithms; FDE provides the validated module layer |
+
+**Safety behaviors:**
+
+- **Graceful fallback on headless Linux.** If no desktop keyring is available, encryption is skipped with a console warning.
+- **Key loss is unrecoverable.** If `db-key.enc` is deleted or the OS keychain is reset, the encrypted database cannot be opened. Delete both `db-key.enc` and `bedrock-chat.db` from the userData directory to start fresh.
+
 ### Custom Theme
 
 Administrators can define a corporate-branded theme by adding a `customTheme` section to `admin-config.json`. The custom theme appears alongside the 7 built-in themes in the Settings dropdown.
@@ -252,6 +280,7 @@ The application has undergone a comprehensive security review against CMMC Level
 | SSO token permissions | Cache files `0o600`, directories `0o700` |
 | Permission hardening | Least-privilege Electron permission handlers (`openExternal` only) |
 | Navigation lockdown | External URLs opened in system browser; in-app navigation blocked |
+| Database encryption | SQLCipher AES-256 always-on; key protected by OS keychain via `safeStorage` |
 | Secure delete | `PRAGMA secure_delete = ON`; `VACUUM` after data wipe |
 | Error recovery | React error boundary prevents full-app crashes |
 | Source maps | Disabled in production builds |
@@ -298,6 +327,7 @@ win:
 All local data is stored in the Electron user data directory:
 
 - **Database:** `{userData}/bedrock-chat.db` — conversations, messages, SSO configs, settings
+- **Encryption key:** `{userData}/db-key.enc` — safeStorage-encrypted database key
 - **SSO tokens:** `~/.aws/sso/cache/` — cached SSO access tokens (AWS CLI compatible)
 
-The database uses WAL mode for integrity and `PRAGMA secure_delete = ON` to zero freed pages. The "Wipe All Data" option in Settings permanently deletes all conversations, messages, and saved SSO configurations, followed by a `VACUUM` to eliminate residual data.
+The database uses WAL mode for integrity and `PRAGMA secure_delete = ON` to zero freed pages. The database file is encrypted with SQLCipher AES-256 and is unreadable without the OS-keychain-protected key. The "Wipe All Data" option in Settings permanently deletes all conversations, messages, and saved SSO configurations, followed by a `VACUUM` to eliminate residual data.
